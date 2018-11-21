@@ -2,9 +2,6 @@ var { google } = require('googleapis');
 var authenticate = require('./OAuth2.js');
 
 
-// https://developers.google.com/youtube/v3/getting-started#quota
-// https://developers.google.com/identity/protocols/googlescopes#youtubev3
-
 var SCOPES = ['https://www.googleapis.com/auth/youtube.readonly'];
 
 authenticate(SCOPES).then((auth) => getChannel(auth));
