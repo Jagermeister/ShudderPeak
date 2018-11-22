@@ -10,7 +10,6 @@
   "license": "ISC",
   "dependencies": {
     "request": "^2.88.0",
-    "tmi.js": "^1.2.1",
     "ws": "^6.1.2"
   }
 }

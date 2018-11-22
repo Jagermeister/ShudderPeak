@@ -37,6 +37,7 @@ testem.log
 # API
 *client_secret.json
 *credentials.json
+*config.json
 
 # System Files
 .DS_Store

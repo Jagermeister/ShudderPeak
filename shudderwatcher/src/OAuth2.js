@@ -1,19 +1,20 @@
 var fs = require('fs');
-const request = require('request');
+const config = require('./config.json');
+var readline = require('readline');
 
 var TOKEN_PATH = 'credentials.json';
 
 /**
- * Create an OAuth2 client with the given scopes
+ * Fetch credentials from file or user authentication
  *
- * @param {Array[string]} scopes Google API Scopes for access
+ * @param {Array[string]} scopes Scopes for access
  */
 module.exports = (scopes) => {
     return new Promise((resolve, reject) => {
         fs.readFile('client_secret.json', (err, data) => {
             err ? reject(err) : resolve(JSON.parse(data));
         });
-    }).then(data => authorize(data, scopes));
+    }).then(data => fetchCredentials(data, scopes));
 }
 
 /**
@@ -21,7 +22,7 @@ module.exports = (scopes) => {
  *
  * @param {Object} credentials The authorization client credentials.
  */
-function authorize(credentials, scopes) {
+function fetchCredentials(credentials, scopes) {
     return new Promise((resolve, reject) => {
         fs.readFile(TOKEN_PATH, (err, token) => {
             if (err) {
@@ -36,30 +37,30 @@ function authorize(credentials, scopes) {
 }
 
 /**
- * Get and store new token after prompting for user authorization, and then
- * execute the given callback with the authorized OAuth2 client.
+ * Get and store new token after prompting for user authorization
  *
  */
 function getNewToken(credentials, scopes) {
     return new Promise((resolve, reject) => {
-        const body = {
-            'client_id': credentials.client_id,
-            'client_secret': credentials.client_secret,
-            'grant_type': 'client_credentials',
-            'scope': scopes.join(' ')
-        }
+        const authUrl = `${config.auth.endpoint}?client_id=${credentials.client_id}&redirect_uri=http://localhost&response_type=token&scope=${scopes.join(' ')}`;
+        console.log('Authorize this app by visiting this url:', authUrl);
+        var rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+        rl.question('Enter the URL from that page here:', (code) => {
+            rl.close();
 
-        request.post('https://id.twitch.tv/oauth2/token', { json: body }, (err, response, body) => {
-            if (err) {
-                reject();
-            } else {
-                const token = Object.assign(
-                    { 'created': Date.now()}, 
-                    body
-                )
-                storeToken(token);
-                resolve(token);
-            }
+            const token = Object.assign(
+                processURL(code),
+                {
+                    username: credentials.username,
+                    created: Date.now()
+                }
+            );
+
+            storeToken(token);
+            resolve(token);
         });
     });
 }
@@ -74,4 +75,25 @@ function storeToken(token) {
         if (err) throw err;
         console.log('Token stored to ' + TOKEN_PATH);
     });
+}
+
+/**
+ * Tranform url with querystring into key:value dictionary
+ *
+ * @param {string} url The URL address.
+ */
+function processURL(url) {
+    const parameterStart = '#',
+        tokenDelimiter = '&',
+        keyValueDelimiter = '=';
+    const queryString = url.indexOf(parameterStart) ? url.split('#')[1] : url;
+    const parameters = queryString.split(tokenDelimiter);
+
+    const keyValues = {};
+    parameters.forEach(element => {
+        let kv = element.split(keyValueDelimiter);
+        keyValues[kv[0]] = kv[1];
+    });
+
+    return keyValues;
 }

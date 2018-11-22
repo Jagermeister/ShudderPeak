@@ -1,4 +1,5 @@
 const WebSocket = require('ws');
+const config = require('./config.json');
 
 class chatClient {
     
@@ -6,25 +7,19 @@ class chatClient {
         this.username = options.username;
         this.password = options.password;
         this.channel = options.channel;
-
-        this.server = 'irc-ws.chat.twitch.tv';
-        this.port = 443;
+        this.server = config.irc.endpoint;
+        this.port = config.irc.port;
     }
 
-    open(){
-        this.webSocket = new WebSocket('wss://' + this.server + ':' + this.port + '/', 'irc');
-
+    open() {
+        this.webSocket = new WebSocket(`wss://${this.server}:${this.port}/`, 'irc');
         this.webSocket.onmessage = this.onMessage.bind(this);
-        this.webSocket.onerror = this.onError.bind(this);
-        this.webSocket.onclose = this.onClose.bind(this);
+        this.webSocket.onerror = (msg) => console.log('Error:', msg);
+        this.webSocket.onclose = () => console.log('Disconnected');
         this.webSocket.onopen = this.onOpen.bind(this);
     }
 
-    onError(message){
-        console.log('Error: ' + message);
-    }
-
-    onMessage(message){
+    onMessage(message) {
         if(message !== null){
             var parsed = this.parseMessage(message.data);
             console.log(parsed);
@@ -61,24 +56,21 @@ class chatClient {
         return parsedMessage;
     }
 
-    onOpen(){
+    onOpen() {
         var socket = this.webSocket;
-
         if (socket !== null && socket.readyState === 1) {
             console.log('Connecting and authenticating...');
-
-            socket.send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
+            if (config.irc.capability_negotiation.length) {
+                const cap_req = config.irc.capability_negotiation.join(' ');
+                socket.send(`CAP REQ :${cap_req}`);
+            }
             socket.send('PASS ' + this.password);
             socket.send('NICK ' + this.username);
             socket.send('JOIN ' + this.channel);
         }
     }
 
-    onClose(){
-        console.log('Disconnected from the chat server.');
-    }
-
-    close(){
+    close() {
         if(this.webSocket){
             this.webSocket.close();
         }
