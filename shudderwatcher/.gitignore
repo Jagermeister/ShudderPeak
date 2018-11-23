@@ -38,6 +38,7 @@ testem.log
 *client_secret.json
 *credentials.json
 *config.json
+*emoticon_images.json
 
 # System Files
 .DS_Store

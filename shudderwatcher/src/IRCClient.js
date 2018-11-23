@@ -9,6 +9,8 @@ class chatClient {
         this.channel = options.channel;
         this.server = config.irc.endpoint;
         this.port = config.irc.port;
+
+        this.emoteRegex = /emotes=(.*?);/;
     }
 
     open() {
@@ -20,9 +22,30 @@ class chatClient {
     }
 
     onMessage(message) {
-        if(message !== null){
+        if (message !== null) {
             var parsed = this.parseMessage(message.data);
-            console.log(parsed);
+            if (parsed.command === "PRIVMSG"){
+                const emoteMatch = this.emoteRegex.exec(parsed.tags);
+                if (emoteMatch && emoteMatch[1] !== "") {
+                    // In the format of:
+                    // 16396:3-11/12006:13-20,22-29/16190:31-39
+                    // 1217039:69-75/55338:77-86
+                    // 1039217:0-6
+                    const emotes = emoteMatch[1].split('/');
+                    const emoteCountsById = {};
+                    emotes.forEach(e => {
+                        const emoteParts = e.split(':');
+                        const eId = emoteParts[0];
+                        const eCount = emoteParts[1].split(',').length;
+                        emoteCountsById[eId] = eCount;
+                    })
+
+                    console.log(emoteCountsById);
+                }
+                console.log(parsed.message, message.data);
+            } else {
+                console.log('>>>', message);
+            }
         }
     }
 
@@ -31,7 +54,6 @@ class chatClient {
             message: null,
             tags: null,
             command: null,
-            original: rawMessage,
             channel: null,
             username: null
         };
