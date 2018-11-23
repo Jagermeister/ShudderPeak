@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const config = require('./config.json');
+const ChatStatistics = require('./chatstatistics.js');
 
 class chatClient {
     
@@ -10,7 +11,14 @@ class chatClient {
         this.server = config.irc.endpoint;
         this.port = config.irc.port;
 
-        this.emoteRegex = /emotes=(.*?);/;
+        this.stats = new ChatStatistics();
+
+        let statRef = this.stats;
+        let report = () => {
+            statRef.report();
+            setTimeout(report, 10000)
+        }
+        report();
     }
 
     open() {
@@ -25,27 +33,11 @@ class chatClient {
         if (message !== null) {
             var parsed = this.parseMessage(message.data);
             if (parsed.command === "PRIVMSG"){
-                const emoteMatch = this.emoteRegex.exec(parsed.tags);
-                if (emoteMatch && emoteMatch[1] !== "") {
-                    // In the format of:
-                    // 16396:3-11/12006:13-20,22-29/16190:31-39
-                    // 1217039:69-75/55338:77-86
-                    // 1039217:0-6
-                    const emotes = emoteMatch[1].split('/');
-                    const emoteCountsById = {};
-                    emotes.forEach(e => {
-                        const emoteParts = e.split(':');
-                        const eId = emoteParts[0];
-                        const eCount = emoteParts[1].split(',').length;
-                        emoteCountsById[eId] = eCount;
-                    })
-
-                    console.log(emoteCountsById);
-                }
-                console.log(parsed.message, message.data);
-            } else {
-                console.log('>>>', message);
+                this.stats.observe(parsed);
             }
+            /*else {
+                console.log('>>>', message.data);
+            }*/
         }
     }
 
@@ -81,7 +73,6 @@ class chatClient {
     onOpen() {
         var socket = this.webSocket;
         if (socket !== null && socket.readyState === 1) {
-            console.log('Connecting and authenticating...');
             if (config.irc.capability_negotiation.length) {
                 const cap_req = config.irc.capability_negotiation.join(' ');
                 socket.send(`CAP REQ :${cap_req}`);
