@@ -40,7 +40,7 @@ function fetchCredentials(credentials, scopes) {
  * Get and store new token after prompting for user authorization
  *
  */
-function getNewToken(credentials, scopes) {
+function getNewToken(credentials, scopes=[]) {
     return new Promise((resolve, reject) => {
         const authUrl = `${config.auth.endpoint}?client_id=${credentials.client_id}&redirect_uri=http://localhost&response_type=token&scope=${scopes.join(' ')}`;
         console.log('Authorize this app by visiting this url:', authUrl);
