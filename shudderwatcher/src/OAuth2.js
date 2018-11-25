@@ -1,8 +1,10 @@
-var fs = require('fs');
+const fs = require('fs');
 const config = require('./config.json');
-var readline = require('readline');
+const readline = require('readline');
+const request = require('request');
 
-var TOKEN_PATH = 'credentials.json';
+const TOKEN_PATH = 'credentials.json';
+const redirectPath = 'http://localhost';
 
 /**
  * Fetch credentials from file or user authentication
@@ -26,12 +28,15 @@ function fetchCredentials(credentials, scopes) {
     return new Promise((resolve, reject) => {
         fs.readFile(TOKEN_PATH, (err, token) => {
             if (err) {
-                reject();
+                reject(err);
             } else {
-                resolve(JSON.parse(token));
+                const t = JSON.parse(token);
+                const n = Date.now();
+                const e = 'Token Expired';
+                (t.created + t.expires_in * 1000 < n) ? reject(t) : resolve(t);
             }
         });
-    }).catch(() => {
+    }).catch((token) => {
         return getNewToken(credentials, scopes);
     });
 }
@@ -42,25 +47,47 @@ function fetchCredentials(credentials, scopes) {
  */
 function getNewToken(credentials, scopes=[]) {
     return new Promise((resolve, reject) => {
-        const authUrl = `${config.auth.endpoint}?client_id=${credentials.client_id}&redirect_uri=http://localhost&response_type=token&scope=${scopes.join(' ')}`;
-        console.log('Authorize this app by visiting this url:', authUrl);
+        const action = 'authorize';
+        const params = {
+            'client_id': credentials.client_id,
+            'redirect_uri': 'http://localhost',
+            'response_type': 'code',
+            'scope': scopes.join(' ')
+        };
+        const authUrl = `${config.auth.endpoint+action}?${dictToString(params)}`;
+        console.log('Authorize this app by visiting:', authUrl);
         var rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout
         });
         rl.question('Enter the URL from that page here:', (code) => {
             rl.close();
-
-            const token = Object.assign(
-                processURL(code),
-                {
-                    username: credentials.username,
-                    created: Date.now()
+            resolve(processURL(code))
+        });
+    }).then(code => {
+        return new Promise((resolve, reject) => {
+            const action = 'token';
+            const params = {
+                'client_id': credentials.client_id,
+                'client_secret': credentials.client_secret,
+                'code': code.code,
+                'grant_type': 'authorization_code',
+                'redirect_uri': redirectPath
+            };
+            const tokenUrl = `${config.auth.endpoint+action}?${dictToString(params)}`;
+            request.post(tokenUrl, (err, response, body) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    console.log('body', body);
+                    const token = Object.assign(JSON.parse(body), {
+                        username: credentials.username,
+                        created: Date.now()
+                    });
+                    storeToken(token);
+                    resolve(token);
                 }
-            );
-
-            storeToken(token);
-            resolve(token);
+            });
         });
     });
 }
@@ -83,10 +110,10 @@ function storeToken(token) {
  * @param {string} url The URL address.
  */
 function processURL(url) {
-    const parameterStart = '#',
+    const parameterStart = '?',
         tokenDelimiter = '&',
         keyValueDelimiter = '=';
-    const queryString = url.indexOf(parameterStart) ? url.split('#')[1] : url;
+    const queryString = url.indexOf(parameterStart) ? url.split(parameterStart)[1] : url;
     const parameters = queryString.split(tokenDelimiter);
 
     const keyValues = {};
@@ -96,4 +123,13 @@ function processURL(url) {
     });
 
     return keyValues;
+}
+
+/**
+ * Tranform key:value dictionary into querystring parameters 
+ *
+ * @param {Object} dict Key:Value store.
+ */
+function dictToString(dict) {
+    return Object.keys(dict).map(k => `${k}=${dict[k]}`).join('&');
 }

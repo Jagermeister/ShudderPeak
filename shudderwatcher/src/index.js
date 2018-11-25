@@ -1,4 +1,5 @@
 const authenticate = require('./OAuth2.js');
+const IRCServer = require('./irc/server.js');
 const config = require('./config.json');
 
 const SCOPES = [
@@ -9,10 +10,7 @@ const SCOPES = [
     'whispers:edit'
 ];
 
-
 const credentials = authenticate(SCOPES)
-
-const IRCServer = require('./IRCClient.js');
 credentials.then((token) => {
     const twitch = new IRCServer({
         username: token.username,

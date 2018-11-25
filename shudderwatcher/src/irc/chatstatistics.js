@@ -1,5 +1,5 @@
-const globalEmotes = require('./emoticon_images_0.json');
-const channelEmotes = require('./emoticon_images_2138.json');
+const globalEmotes = require('../emoticon_images_0.json');
+const channelEmotes = require('../emoticon_images_2138.json');
 
 const emotesById = {};
 channelEmotes.emoticon_sets['2138'].forEach(element => {
