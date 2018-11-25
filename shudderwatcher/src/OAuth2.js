@@ -37,7 +37,9 @@ function fetchCredentials(credentials, scopes) {
             }
         });
     }).catch((token) => {
-        return getNewToken(credentials, scopes);
+        return (token && token.refresh_token)
+            ? refreshToken(credentials, token)
+            : getNewToken(credentials, scopes);
     });
 }
 
@@ -89,6 +91,33 @@ function getNewToken(credentials, scopes=[]) {
                 }
             });
         });
+    });
+}
+
+function refreshToken(credentials, token) {
+    return new Promise((resolve, reject) => {
+        const action = 'token';
+        const params = {
+            'client_id': credentials.client_id,
+            'client_secret': credentials.client_secret,
+            'refresh_token': token.refresh_token,
+            'grant_type': 'refresh_token',
+            'scope': token.scope.join(' ')
+        };
+        const tokenUrl = `${config.auth.endpoint+action}?${dictToString(params)}`;
+        request.post(tokenUrl, (err, response, body) => {
+            if (err) {
+                reject(credentials, token);
+            } else {
+                const refreshToken = Object.assign(token, JSON.parse(body), {
+                    created: Date.now()
+                });
+                storeToken(refreshToken);
+                resolve(refreshToken);
+            }
+        });
+    }).catch((credentials, token) => {
+        return getNewToken(credentials, token.scope)
     });
 }
 
