@@ -10,7 +10,7 @@ globalEmotes.emoticon_sets['0'].forEach(element => {
 });
 
 
-class ChatStatistics {
+class MessageStatistics {
     constructor() {
         this.bucket_duration_ms = 30000;
         /*
@@ -114,4 +114,4 @@ class ChatStatistics {
 }
 
 
-module.exports = ChatStatistics
+module.exports = MessageStatistics
