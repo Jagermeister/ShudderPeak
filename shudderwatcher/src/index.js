@@ -1,6 +1,7 @@
 const authenticate = require('./OAuth2.js');
 const IRCServer = require('./irc/server.js');
 const config = require('./config.json');
+const fs = require('fs');
 
 const SCOPES = [
     'chat:read',
@@ -10,13 +11,33 @@ const SCOPES = [
     'whispers:edit'
 ];
 
-const credentials = authenticate(SCOPES)
+const credentials = authenticate(SCOPES);
 credentials.then((token) => {
     const twitch = new IRCServer({
         username: token.username,
         password: 'oauth:' + token.access_token,
-        channel: '#'+config.irc.channel_defaults,
-    })
+    });
 
-    twitch.open();
+    const channelName = '#disguisedtoast';
+
+    twitch.open()
+        .then(() => {
+            twitch.join(channelName);
+            setInterval(() => {
+                fs.writeFile(
+                    'disguisedtoast.json',
+                    JSON.stringify(twitch.channelsByName[channelName].stats.data),
+                    (err) => {
+                        if (err) throw err;
+                        console.log('The file has been saved!');
+                    }
+                );
+            }, 60000);
+        });
+
+
+
+    /*setTimeout(() => {
+        twitch.join('#dogdog')
+    }, 30000)*/
 })

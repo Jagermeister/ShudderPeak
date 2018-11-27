@@ -6,13 +6,14 @@ class Server {
     constructor(options) {
         this.username = options.username;
         this.password = options.password;
-        this.channel = options.channel;
 
         this.server = config.irc.endpoint;
         this.port = config.irc.port;
         this.webSocket = null;
 
         this.channelsByName = {};
+
+        this.serverOnOpenResolve = null;
     }
 
     open() {
@@ -24,11 +25,15 @@ class Server {
             process.exit();
         };
         this.webSocket.onopen = this.onOpen.bind(this);
+        const server = this;
+        return new Promise((resolve, reject) => {
+            server.serverOnOpenResolve = resolve;
+        })
     }
 
     join(channelName) {
         if (!(channelName in this.channelsByName)) {
-            this.send({ command: "Join Channel", message: `JOIN ${this.channel}` });
+            this.send({ command: "Join Channel", message: `JOIN ${channelName}` });
         } else {
             console.log('Already joined channel', channelName);
         }
@@ -36,7 +41,7 @@ class Server {
 
     part(channelName) {
         if (channelName in this.channelsByName) {
-            this.send({ command: "Depart Channel", message: `PART ${this.channel}` });
+            this.send({ command: "Depart Channel", message: `PART ${channelName}` });
         } else {
             console.log('Cannot leave channel you havent joined', channelName);
         }
@@ -131,7 +136,7 @@ class Server {
             }
             this.send({ command: "Set Password", message: `PASS ${this.password}` });
             this.send({ command: "Set Nickname", message: `NICK ${this.username}` });
-            this.join(this.channel);
+            this.serverOnOpenResolve();
         }
     }
 

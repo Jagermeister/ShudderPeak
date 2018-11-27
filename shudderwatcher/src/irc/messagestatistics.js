@@ -1,10 +1,6 @@
 const globalEmotes = require('../emoticon_images_0.json');
-const channelEmotes = require('../emoticon_images_2138.json');
 
 const emotesById = {};
-channelEmotes.emoticon_sets['2138'].forEach(element => {
-    emotesById[element.id] = element.code;
-});
 globalEmotes.emoticon_sets['0'].forEach(element => {
     emotesById[element.id] = element.code;
 });
@@ -66,7 +62,8 @@ class MessageStatistics {
 
             const users = new Set();
             let messageCount = 0,
-                emoteCount = 0;
+                emoteCount = 0,
+                emoteDistinctCount = 0;
 
             let buckets = [];
             for (let t = timeMinCutoff; t <= now; t += this.bucket_duration_ms) {
@@ -75,6 +72,7 @@ class MessageStatistics {
                     end: +t + this.bucket_duration_ms,
                     users: new Set(),
                     emotes: {},
+                    emotesNoSpam: {},
                     messages: 0
                 });
             }
@@ -90,25 +88,30 @@ class MessageStatistics {
                 messageCount++;
                 bucket.users.add(d.user);
                 users.add(d.user);
+                emoteDistinctCount += Object.keys(d.emotes).length;
                 for (let key in d.emotes) {
                     bucket.emotes[key] = bucket.emotes[key] || 0;
                     bucket.emotes[key] += d.emotes[key];
+                    bucket.emotesNoSpam[key] = bucket.emotesNoSpam[key] || 0;
+                    bucket.emotesNoSpam[key]++;
                     emoteCount += d.emotes[key];
                 }
             }
 
             const dateOldest = new Date(buckets[0].start).toISOString();
-            console.log(dateOldest.slice(0, 10), `\tusers (${users.size}), msgs (${messageCount}), emotes (${emoteCount}),`, new Date(Date.now()).toISOString());
+            console.log(dateOldest.slice(0, 10), `\tusers\tmsgs\temotes\tdistinct`, new Date(Date.now()).toISOString());
             for (let i = 0; i < buckets.length; i++) {
                 const b = buckets[i];
-                let emotes = Object.keys(b.emotes).map(k => [k, b.emotes[k]]).sort((a, b) => b[1] - a[1]);
+                let emotes = Object.keys(b.emotes).map(k => [k, b.emotes[k], b.emotesNoSpam[k]]).sort((a, b) => b[1] - a[1]);
                 console.log(
                     ' ' + new Date(b.start).toISOString().slice(10, 19) + '\t',
                     (b.users.size < 9999 ? ('0000' + b.users.size).slice(-4) : b.users.size) + '\t',
-                    (b.messages < 9999 ? ('0000' + b.messages).slice(-4) : b.messages) + '\t\t',
-                    emotes.length ? `${('0000' + emotes[0][1]).slice(-4)} ${emotesById[emotes[0][0]]} (${emotes[0][0]})` : ''
+                    (b.messages < 9999 ? ('0000' + b.messages).slice(-4) : b.messages) + '\t',
+                    emotes.length ? `${('0000' + emotes[0][1]).slice(-4)}\t ${('0000' + emotes[0][2]).slice(-4)}\t${emotesById[emotes[0][0]]} (${emotes[0][0]})` : ''
                 );
             }
+            console.log('----------', `\t-----\t----\t------\t--------`);
+            console.log('          ', `\t${('00000' + users.size).slice(-5)}\t${('00000' + messageCount).slice(-5)}\t${('00000' + emoteCount).slice(-5)}\t${('00000' + emoteDistinctCount).slice(-5)}`);
         }
     }
 }
