@@ -1,6 +1,5 @@
 const authenticate = require('./OAuth2.js');
 const IRCServer = require('./irc/server.js');
-const config = require('./config.json');
 const fs = require('fs');
 
 const SCOPES = [
@@ -18,14 +17,14 @@ credentials.then((token) => {
         password: 'oauth:' + token.access_token,
     });
 
-    const channelName = '#disguisedtoast';
+    const channelName = '#nl_kripp';
 
     twitch.open()
         .then(() => {
             twitch.join(channelName);
             setInterval(() => {
                 fs.writeFile(
-                    'disguisedtoast.json',
+                    'kripp.json',
                     JSON.stringify(twitch.channelsByName[channelName].stats.data),
                     (err) => {
                         if (err) throw err;

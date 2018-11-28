@@ -1,0 +1,6 @@
+/*/images
+*.log
+*.mp4
+*.json
+
+web.config

@@ -1,0 +1,358 @@
+<html>
+
+<head>
+    <title>Watcher Review</title>
+    <script src='./chart.js' type='text/javascript'></script>
+    <script src='./utility.js' type='text/javascript'></script>
+    <script
+        src="https://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous"></script>
+</head>
+<body bgcolor="#24AF69">
+    <table>
+        <tr>
+            <td>
+                <video width="720">
+                    <source src="./20181126_341159577.mp4" type="video/mp4">
+                </video>
+            </td>
+            <td width="360">
+                <table>
+                    <tr>
+                        <td>
+                            <div style="display: inline-table;" id="timelineHighlight"></div>
+                        </td>
+                        <td>
+                            <button onclick="video.play()">PLAY</button>
+                            <button onclick="video.pause()">PAUSE</button>
+                            <br/>
+                            <button onclick="video.playbackRate = 3.0;">3X</button>
+                            <button onclick="video.playbackRate = 1.0;">1X</button>
+                            <button onclick="video.playbackRate = 0.5;">.5X</button>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+    <div id="canvasContainer"></div>
+    <script type="text/javascript">
+        'use strict';
+        const video = document.querySelector("video");
+        const timelineHighlight = document.getElementById("timelineHighlight");
+        const startTimeChatMS = 1543296420538,
+            endTimeChatMS = 1543306092757;
+        const startTimeSec = 1176; //22776
+        video.currentTime = startTimeSec;
+        let currentMessageTime = startTimeChatMS;
+
+        const canvas_width = 1080,
+            canvas_height = 345;
+        const canvas = utility.canvasCreate("canvasContainer", "hexBackground", { width: canvas_width+20, height: canvas_height });
+        const ctx = canvas.getContext("2d");
+
+        const fontSize = 20;
+        const charts = [];
+
+        var keyDownEvents = {};
+        const buckets = [];
+        const bucket_duration_ms = 40000,
+            bucket_duration_sec = bucket_duration_ms / 1000;
+
+        let rawMessageData = null;
+        const emoteKeys = new Set();
+        function init() {
+            charts.push(new Chart({
+                x: 0, y: 0, width: canvas_width, height: 150
+            }));
+            charts.push(new Chart({
+                x: 0, y: 150, width: canvas_width, height: 150
+            }));
+
+            $.getJSON('disguisedtoast.json', (data) => {
+                rawMessageData = data;
+                const perfBefore = performance.now();
+                const timeMinCutoff = +data[0].time,
+                    now = +data[data.length-1].time;
+
+                bucketsCreate();
+
+                console.log('Compute', (performance.now() - perfBefore) / 1000 / 60)
+                chartsBuild();
+                display();
+            });
+            
+            keyDownEvents = {
+                39: () => timelineMoveForward(),
+                37: () => timelineMoveBackward()
+            };
+
+            ctx.font = fontSize + 'px Courier New';
+
+            setInterval(() => {
+                currentMessageTime = (video.currentTime - startTimeSec) * 1000 + startTimeChatMS;
+                if (!video.paused) {
+                    display();
+                    updateTimelineHighlight();
+                }
+            }, 500)
+        }
+
+        let xDomainStart = startTimeChatMS,
+            xDomainEnd = endTimeChatMS;
+        function xToTime(x) {
+            const xPercentage = x / canvas_width;
+            const domain = xPercentage * (xDomainEnd - xDomainStart) + xDomainStart
+            return {
+                percentage: xPercentage,
+                domain: domain,
+                video: ((domain - startTimeChatMS) / (endTimeChatMS - startTimeChatMS)) * (video.duration - startTimeSec) + startTimeSec,
+            };
+        }
+
+        function bucketsCreate(duration=bucket_duration_ms) {
+            buckets.length = 0;
+            for (let t = xDomainStart; t <= xDomainEnd; t += duration) {
+                buckets.push({
+                    start: +t,
+                    end: +t + duration,
+                    users: new Set(),
+                    emotes: {},
+                    emotesNoSpam: {},
+                    emoteCount: 0,
+                    messages: 0
+                });
+            }
+
+            let bucket = buckets[0];
+            for(let i = 0, l = rawMessageData.length; i < l; i++) {
+                const d = rawMessageData[i];
+                if (d.time < bucket.start) {
+                    continue;
+                } else if (d.time > bucket.end) {
+                    bucket = buckets.filter(b => b.start <= d.time && d.time < b.end)[0];
+                }
+
+                if (!bucket) {
+                    break;
+                }
+
+                bucket.messages++;
+                bucket.users.add(d.user);
+                bucket.emoteCount += Object.keys(d.emotes).reduce((p, c) => p + d.emotes[c], 0);
+                for (let key in d.emotes) {
+                    emoteKeys.add(key);
+                    bucket.emotes[key] = bucket.emotes[key] || 0;
+                    bucket.emotes[key] += d.emotes[key];
+                    bucket.emotesNoSpam[key] = bucket.emotesNoSpam[key] || 0;
+                    bucket.emotesNoSpam[key]++;
+                }
+            }
+        }
+
+        function chartsBuild() {
+            charts[0].data = {
+                0: buckets.map(b => b.messages),
+                1: buckets.map(b => b.users.size),
+                2: buckets.map(b => b.emoteCount),
+            };
+
+            let emoteLines = [];
+            charts[1].data = {};
+            Array.from(emoteKeys)
+                .sort((a, b) => 
+                    buckets.map(u => b in u.emotes ? u.emotes[b] : 0).reduce((p, c) => p + c, 0) - buckets.map(u => a in u.emotes ? u.emotes[a] : 0).reduce((p, c) => p + c, 0)
+                )
+                .forEach((k, i) => {
+                    const arr = buckets.map(b => k in b.emotes ? b.emotes[k] : 0);
+                    emoteLines.push(arr);
+                    charts[1].data[i + '_' + k] = arr;
+                }
+            );
+        }
+
+        function updateTimelineHighlight() {
+            const start = currentMessageTime - bucket_duration_ms/2,
+                end = currentMessageTime + bucket_duration_ms/2;
+
+            const timeRangeData = rawMessageData.filter(d => d.time >= start && d.time < end);
+
+            let messages = 0,
+                users = new Set(),
+                emoteCount = 0,
+                emotes = {},
+                emotesNoSpam = {};
+            for(let i = 0, l = timeRangeData.length; i < l; i++) {
+                const d = timeRangeData[i];
+                messages++;
+                users.add(d.user);
+                emoteCount += Object.keys(d.emotes).reduce((p, c) => p + d.emotes[c], 0);
+                for (let key in d.emotes) {
+                    emotes[key] = emotes[key] || 0;
+                    emotes[key] += d.emotes[key];
+                    emotesNoSpam[key] = emotesNoSpam[key] || 0;
+                    emotesNoSpam[key]++;
+                }
+            }
+
+            timelineHighlight.innerHTML = `
+                <span style="background-color: ${utility.colors[0]};">Messages</span>: ${messages}<br/>
+                <span style="background-color: ${utility.colors[1]};">Users</span>: ${users.size}<br/>
+                <span style="background-color: ${utility.colors[2]};">Images</span>: ${emoteCount}<br/>
+                TOP IMAGES:<br/>
+                ${Object.keys(emotes)
+                    .map(k => [k, emotes[k], emotesNoSpam[k]])
+                    .sort((a, b) => a[1] - b[1])
+                    .map(e => e[1] + ' <img height="45" src="./images/' + e[0] + '.png"/><br/>')
+                    .slice(-4)
+                    .reverse()
+                    .join('')}
+            `;
+        }
+
+        function timelineMoveBackward() {
+            const sec = bucket_duration_sec/2,
+                ms = bucket_duration_ms/2;
+            if (video.currentTime - sec < startTimeSec) {
+                video.currentTime = startTimeSec;
+            } else {
+                video.currentTime -= sec;
+            }
+
+            if (currentMessageTime - ms < startTimeChatMS) {
+                currentMessageTime = startTimeChatMS;
+            } else {
+                currentMessageTime -= ms;
+            }
+
+            display();
+            updateTimelineHighlight();
+        }
+
+        function timelineMoveForward() {
+            const sec = bucket_duration_sec/2,
+                ms = bucket_duration_ms/2;
+            if (video.currentTime + sec > video.duration) {
+                video.currentTime = video.duration;
+            } else {
+                video.currentTime += sec;
+            }
+
+            if (currentMessageTime + ms > endTimeChatMS) {
+                currentMessageTime = endTimeChatMS;
+            } else {
+                currentMessageTime += ms;
+            }
+
+            display();
+            updateTimelineHighlight();
+        }
+
+        canvas.addEventListener("mousedown", event => {
+            const canvas_bounds = canvas.getBoundingClientRect();
+            let y = event.clientY - canvas_bounds.top,
+                x = event.clientX - canvas_bounds.left;
+
+            const xTime = xToTime(x);
+
+            video.currentTime = xTime.video;
+            currentMessageTime = xTime.domain;
+            display();
+            updateTimelineHighlight();
+        });
+
+        canvas.addEventListener('wheel', event => {
+            const canvas_bounds = canvas.getBoundingClientRect();
+            const y = event.clientY - canvas_bounds.top,
+                x = event.clientX - canvas_bounds.left;
+            const xTime = xToTime(x);
+            const xDomainDuration = xDomainEnd - xDomainStart;
+
+            if (event.deltaY < 0) {
+                const minBucketsShown = 50;
+                if (xDomainDuration == minBucketsShown * bucket_duration_ms) {
+                    return
+                }
+                const newDuration = xDomainDuration * 0.75;
+                if (newDuration < bucket_duration_ms * minBucketsShown) {
+                    xDomainStart = xTime.domain - bucket_duration_ms * minBucketsShown/2;
+                    xDomainEnd = xTime.domain + bucket_duration_ms * minBucketsShown/2;
+                    if (xDomainStart < startTimeChatMS) {
+                        xDomainStart = startTimeChatMS
+                        xDomainEnd = startTimeChatMS + minBucketsShown * bucket_duration_ms;
+                    } else if (xDomainEnd > endTimeChatMS) {
+                        xDomainEnd = endTimeChatMS;
+                        xDomainStart = xDomainEnd - minBucketsShown * bucket_duration_ms;
+                    }
+                } else {
+                    xDomainStart = xTime.domain - newDuration * xTime.percentage;
+                    xDomainEnd = xDomainStart + newDuration;
+                }
+            } else {
+                const maxDuration = endTimeChatMS - startTimeChatMS
+                if (xDomainDuration == maxDuration) {
+                    return
+                }
+                const newDuration = xDomainDuration * 2;
+                if (newDuration > maxDuration) {
+                    xDomainStart = startTimeChatMS;
+                    xDomainEnd = endTimeChatMS;
+                } else {
+                    xDomainStart = xTime.domain - newDuration * xTime.percentage;
+                    xDomainEnd = xDomainStart + newDuration;
+                    if (xDomainStart < startTimeChatMS) {
+                        xDomainStart = startTimeChatMS
+                        xDomainEnd = startTimeChatMS + newDuration;
+                    } else if (xDomainEnd > endTimeChatMS) {
+                        xDomainEnd = endTimeChatMS;
+                        xDomainStart = xDomainEnd - newDuration;
+                    }
+                }
+            }
+
+            bucketsCreate()
+            chartsBuild();
+            display();
+
+            return false; 
+        }, false);
+
+        window.addEventListener("keydown", event => {
+            let f = keyDownEvents[event.keyCode.toString()];
+            if (f) { f(); }
+        });
+
+        function display() {
+            ctx.clearRect(0, 0, canvas_width, canvas_height);
+
+            ctx.fillStyle = 'rgba(240, 0, 0, 0.3)';
+            let xVideoTimeStart = (currentMessageTime - xDomainStart - bucket_duration_ms/2) / (xDomainEnd - xDomainStart) * canvas_width,
+                xVideoTimeEnd = (currentMessageTime - xDomainStart + bucket_duration_ms/2) / (xDomainEnd - xDomainStart) * canvas_width;
+
+            if (xVideoTimeStart < 0) {
+                xVideoTimeStart = 0;
+            }
+            if (xVideoTimeEnd > canvas_width) {
+                xVideoTimeEnd = canvas_width;
+            }
+            ctx.fillRect(xVideoTimeStart, 0, xVideoTimeEnd - xVideoTimeStart, canvas_height);
+
+            //ctx.beginPath();
+            //const xVideoTime = (video.currentTime - startTimeSec) / (video.duration - startTimeSec) * canvas_width;
+            //ctx.strokeStyle = 'red';
+            //ctx.moveTo(xVideoTime, 0);
+            //ctx.lineTo(xVideoTime, canvas_height);
+            //ctx.stroke();
+
+            for (let i = 0, l = charts.length; i < l; i++) {
+                charts[i].display(ctx);
+            }
+        }
+
+        window.onload = function () {
+            init();
+        }
+    </script>
+</body>
+</html>
