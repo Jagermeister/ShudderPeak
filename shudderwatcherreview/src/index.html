@@ -1,5 +1,4 @@
 <html>
-
 <head>
     <title>Watcher Review</title>
     <script src='./chart.js' type='text/javascript'></script>
@@ -41,11 +40,7 @@
         'use strict';
         const video = document.querySelector("video");
         const timelineHighlight = document.getElementById("timelineHighlight");
-        const startTimeChatMS = 1543296420538,
-            endTimeChatMS = 1543306092757;
-        const startTimeSec = 1176; //22776
-        video.currentTime = startTimeSec;
-        let currentMessageTime = startTimeChatMS;
+
 
         const canvas_width = 1080,
             canvas_height = 345;
@@ -62,6 +57,13 @@
 
         let rawMessageData = null;
         const emoteKeys = new Set();
+
+        
+        const startTimeChatMS = 1543296420538,
+            endTimeChatMS = 1543306092757;
+        const startTimeSec = 1176; //22776
+        video.currentTime = startTimeSec;
+        let currentMessageTime = startTimeChatMS;
         function init() {
             charts.push(new Chart({
                 x: 0, y: 0, width: canvas_width, height: 150
@@ -70,18 +72,22 @@
                 x: 0, y: 150, width: canvas_width, height: 150
             }));
 
-            $.getJSON('disguisedtoast.json', (data) => {
-                rawMessageData = data;
-                const perfBefore = performance.now();
-                const timeMinCutoff = +data[0].time,
-                    now = +data[data.length-1].time;
+            $.getJSON('videos.json', videos => {
+                let video = videos.videos[0];
+                document.querySelector("video > source").setAttribute('src', './'+video.source);
+                $.getJSON(video.messages, data => {
+                    rawMessageData = data;
+                    const perfBefore = performance.now();
+                    const timeMinCutoff = +data[0].time,
+                        now = +data[data.length-1].time;
 
-                bucketsCreate();
+                    bucketsCreate();
 
-                console.log('Compute', (performance.now() - perfBefore) / 1000 / 60)
-                chartsBuild();
-                display();
-            });
+                    console.log('Compute', (performance.now() - perfBefore) / 1000 / 60)
+                    chartsBuild();
+                    display();
+                });
+            })
             
             keyDownEvents = {
                 39: () => timelineMoveForward(),
