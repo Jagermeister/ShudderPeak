@@ -24,7 +24,7 @@ credentials.then((token) => {
             twitch.join(channelName);
             setInterval(() => {
                 fs.writeFile(
-                    'kripp.json',
+                    'kripp2.json',
                     JSON.stringify(twitch.channelsByName[channelName].stats.data),
                     (err) => {
                         if (err) throw err;
@@ -33,10 +33,4 @@ credentials.then((token) => {
                 );
             }, 60000);
         });
-
-
-
-    /*setTimeout(() => {
-        twitch.join('#dogdog')
-    }, 30000)*/
 })

@@ -111,10 +111,9 @@ class MessageStatistics {
                 );
             }
             console.log('----------', `\t-----\t----\t------\t--------`);
-            console.log('          ', `\t${('00000' + users.size).slice(-5)}\t${('00000' + messageCount).slice(-5)}\t${('00000' + emoteCount).slice(-5)}\t${('00000' + emoteDistinctCount).slice(-5)}`);
+            console.log(('          '+buckets.length).slice(-10), `\t${('00000' + users.size).slice(-5)}\t${('00000' + messageCount).slice(-5)}\t${('00000' + emoteCount).slice(-5)}\t${('00000' + emoteDistinctCount).slice(-5)}`);
         }
     }
 }
-
 
 module.exports = MessageStatistics

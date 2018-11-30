@@ -14,9 +14,9 @@ utility.getParameterByName = function(name) {
 };
 
 utility.canvasCreate = function(containerId, id, dimensions) {
-    let container = document.getElementById(containerId);
+    const container = document.getElementById(containerId);
     if (container) {
-        let canvas = document.createElement('CANVAS');
+        const canvas = document.createElement('CANVAS');
         canvas.id = id;
         canvas.setAttribute('width', dimensions.width);
         canvas.setAttribute('height', dimensions.height);

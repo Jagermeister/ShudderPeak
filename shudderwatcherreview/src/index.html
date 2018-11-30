@@ -17,6 +17,9 @@
                             <div style="display: inline-table;" id="timelineHighlight"></div>
                         </td>
                         <td>
+                            <select id="vSelect"></select>
+                            <br />
+                            <br />
                             <button onclick="videoElement.play()">PLAY</button>
                             <button onclick="videoElement.pause(); clearTimeout(highlightTimeoutId);">PAUSE</button>
                             <br />
@@ -48,7 +51,7 @@
         const keyDownEvents = {};
 
         const buckets = [];
-        const bucket_duration_ms = 40000,
+        const bucket_duration_ms = 20000,
             bucket_duration_sec = bucket_duration_ms / 1000;
 
         let rawMessageData = null;
@@ -59,14 +62,46 @@
             currentMessageTime,
             startTimeSec;
 
-        let videoMetaData;
+        let videosMetaData, videoMetaData;
         let highlightBuckets;
         let highlightTimeoutId;
 
+        let messagesLoadedResolve;
         function init() {
-            charts.push(new Chart({ x: 0, y: 0, width: canvas_width, height: 250 }));
-            charts.push(new Chart({ x: 0, y: 250, width: canvas_width, height: 150 }));
-            let messagesLoadedResolve;
+            fetch('videos.json')
+                .then(response => response.json())
+                .then(videos => {
+                    videosMetaData = videos.videos;
+                    const vSelect = document.querySelector("#vSelect");
+                    vSelect.onchange = () => {
+                        videoSet(videosMetaData[vSelect.selectedIndex]);
+                    };
+                    videos.videos.forEach(v => {
+                        const o = document.createElement('option');
+                        o.value = v._id;
+                        o.innerHTML = v.channel;
+                        vSelect.appendChild(o);
+                    })
+
+                    return videos.videos[0];
+                })
+                .then(video => videoSet(video));
+
+            keyDownEvents[39] = () => timelineMoveForward();
+            keyDownEvents[37] = () => timelineMoveBackward();
+
+            ctx.font = fontSize + 'px Courier New';
+            setInterval(() => {
+                currentMessageTime = (videoElement.currentTime - startTimeSec) * 1000 + startTimeChatMS;
+                if (!videoElement.paused) {
+                    display();
+                    updateTimelineHighlight();
+                }
+            }, 500)
+        }
+
+        function videoSet(video) {
+            loadingPromises.length = 0;
             loadingPromises.push(
                 new Promise((resolve, reject) => {
                     videoElement.addEventListener('loadeddata', (e) => {
@@ -79,25 +114,19 @@
                     messagesLoadedResolve = resolve;
                 })
             );
-
-            fetch('videos.json')
+            videoMetaData = video;
+            videoElement.setAttribute('src', './' + video.source);
+            fetch(video.messages)
                 .then(response => response.json())
-                .then(videos => {
-                    let video = videos.videos[1];
-                    videoElement.setAttribute('src', './' + video.source);
-                    return video;
-                })
-                .then(video => {
-                    videoMetaData = video;
-                    fetch(video.messages)
-                        .then(response => response.json())
-                        .then(messages => {
-                            rawMessageData = messages;
-                            currentMessageTime = xDomainStart = startTimeChatMS = +messages[0].time;
-                            xDomainEnd = endTimeChatMS = +messages[messages.length - 1].time;
-                            messagesLoadedResolve();
-                        });
-                })
+                .then(messages => {
+                    rawMessageData = messages;
+                    currentMessageTime = xDomainStart = startTimeChatMS = +messages[0].time;
+                    xDomainEnd = endTimeChatMS = +messages[messages.length - 1].time;
+                    charts.length = 0;
+                    charts.push(new Chart({ x: 0, y: 0, width: canvas_width, height: 250 }));
+                    charts.push(new Chart({ x: 0, y: 250, width: canvas_width, height: 150 }));
+                    messagesLoadedResolve();
+                });
 
             Promise.all(loadingPromises)
                 .then(() => {
@@ -116,18 +145,6 @@
                     chartsBuild();
                     display();
                 });
-
-            keyDownEvents[39] = () => timelineMoveForward();
-            keyDownEvents[37] = () => timelineMoveBackward();
-
-            ctx.font = fontSize + 'px Courier New';
-            setInterval(() => {
-                currentMessageTime = (videoElement.currentTime - startTimeSec) * 1000 + startTimeChatMS;
-                if (!videoElement.paused) {
-                    display();
-                    updateTimelineHighlight();
-                }
-            }, 500)
         }
 
         function playHighlights() {
@@ -135,13 +152,14 @@
             const videoRemainingTime = videoElement.duration - videoElement.currentTime;
             const videoCurrentDateTime = videoEndDateTime - videoRemainingTime * 1000;
 
+            const leadInTime = 2000;
             let closestBucket = highlightBuckets.map(b => b[2])
                 .filter(b => videoCurrentDateTime < b.end);
 
             closestBucket = closestBucket ? closestBucket[0] : highlightBuckets[0];
-            if (videoCurrentDateTime < closestBucket.start) {
-                videoElement.currentTime = videoElement.duration - (videoEndDateTime - closestBucket.start) / 1000;
-                currentMessageTime = closestBucket.start;
+            if (videoCurrentDateTime < closestBucket.start - leadInTime) {
+                videoElement.currentTime = videoElement.duration - (videoEndDateTime - closestBucket.start - leadInTime) / 1000;
+                currentMessageTime = closestBucket.start - leadInTime;
             }
 
             if (videoElement.paused) videoElement.play();
@@ -206,7 +224,7 @@
             const mean = [],
                 upper = [],
                 upperupper = [];
-            const bucketHistory = 12;
+            const bucketHistory = 480 / bucket_duration_sec;
             for (let i = 0, l = buckets.length; i < l; i++) {
                 const s = seriesStats(
                     buckets.slice((i-bucketHistory < 0) ? 0 : (i - bucketHistory), i+1)

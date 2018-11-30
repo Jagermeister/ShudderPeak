@@ -21,7 +21,6 @@ class Chart {
     }
 
     yRange(domain) {
-        //return this.y + this.height * (1 - Math.log(domain > 5 ? domain : 1) / Math.log(this.yDomainEnd));
         return this.y + this.height * (1 - domain / this.yDomainEnd);
     }
 
@@ -37,7 +36,7 @@ class Chart {
                     .reduce((p, c) => Math.max(p, c), 0);
             }
 
-            ctx.fillStyle = 'rgba(40, 40, 210, 0.25)'
+            ctx.fillStyle = 'rgba(40, 40, 210, 0.25)';
             for (let i = 0, l = this.highlightBoxes.length; i < l; i++) {
                 const box = this.highlightBoxes[i];
                 ctx.fillRect(this.xRange(box[0] - 0.5), this.y, this.xRange(1), this.height);
@@ -56,7 +55,6 @@ class Chart {
                 ctx.stroke();
             }
 
-            //if (this.title) utility.strokeText(ctx, this.title, x + 50, y);
             ctx.strokeStyle = 'black';
             utility.strokeText(ctx, this.yDomainEnd, x + 50, y + fontSize, true);
             ctx.beginPath();
