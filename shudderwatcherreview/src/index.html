@@ -18,11 +18,13 @@
                         </td>
                         <td>
                             <button onclick="videoElement.play()">PLAY</button>
-                            <button onclick="videoElement.pause()">PAUSE</button>
+                            <button onclick="videoElement.pause(); clearTimeout(highlightTimeoutId);">PAUSE</button>
                             <br />
                             <button onclick="videoElement.playbackRate = 3.0;">3X</button>
                             <button onclick="videoElement.playbackRate = 1.0;">1X</button>
                             <button onclick="videoElement.playbackRate = 0.5;">.5X</button>
+                            <br />
+                            <button onclick="playHighlights()">Highlights</button>
                         </td>
                     </tr>
                 </table>
@@ -58,6 +60,9 @@
             startTimeSec;
 
         let videoMetaData;
+        let highlightBuckets;
+        let highlightTimeoutId;
+
         function init() {
             charts.push(new Chart({ x: 0, y: 0, width: canvas_width, height: 250 }));
             charts.push(new Chart({ x: 0, y: 250, width: canvas_width, height: 150 }));
@@ -125,6 +130,24 @@
             }, 500)
         }
 
+        function playHighlights() {
+            const videoEndDateTime = new Date(videoMetaData.created_at).getTime() + videoMetaData.length * 1000;
+            const videoRemainingTime = videoElement.duration - videoElement.currentTime;
+            const videoCurrentDateTime = videoEndDateTime - videoRemainingTime * 1000;
+
+            let closestBucket = highlightBuckets.map(b => b[2])
+                .filter(b => videoCurrentDateTime < b.end);
+
+            closestBucket = closestBucket ? closestBucket[0] : highlightBuckets[0];
+            if (videoCurrentDateTime < closestBucket.start) {
+                videoElement.currentTime = videoElement.duration - (videoEndDateTime - closestBucket.start) / 1000;
+                currentMessageTime = closestBucket.start;
+            }
+
+            if (videoElement.paused) videoElement.play();
+            highlightTimeoutId = setTimeout(playHighlights, 1000);
+        }
+
         function xToTime(x) {
             const xPercentage = x / canvas_width;
             const domain = xPercentage * (xDomainEnd - xDomainStart) + xDomainStart
@@ -180,7 +203,6 @@
 
         function chartsBuild() {
             const stats = seriesStats(buckets.map(b => b.messages));
-            console.log(...stats)
             const mean = [],
                 upper = [],
                 upperupper = [];
@@ -196,8 +218,6 @@
                 upperupper.push(s[0] + s[1]+ s[1]);
             }
 
-
-
             charts[0].data = {
                 0: buckets.map(b => b.messages),
                 1: buckets.map(b => b.users.size),
@@ -209,7 +229,7 @@
                 //6: upperupper,
             };
 
-            charts[0].highlightBoxes = buckets.map((b, i) => [i, b.messages + b.emoteCount])
+            charts[0].highlightBoxes = highlightBuckets = buckets.map((b, i) => [i, b.messages + b.emoteCount, b])
                 .filter((b, i) => b[1] > upperupper[i]);
 
             let emoteLines = [];
