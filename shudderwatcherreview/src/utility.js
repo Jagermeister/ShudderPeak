@@ -21,7 +21,7 @@ utility.canvasCreate = function(containerId, id, dimensions) {
         canvas.setAttribute('width', dimensions.width);
         canvas.setAttribute('height', dimensions.height);
         canvas.oncontextmenu = 'return false;';
-        canvas.style.background = 'rgb(130, 187, 236)';
+        canvas.style.background = 'rgb(185, 206, 204)';
         container.appendChild(canvas);
         return canvas;
     }

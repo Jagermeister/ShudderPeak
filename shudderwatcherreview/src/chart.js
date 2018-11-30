@@ -13,6 +13,7 @@ class Chart {
         this.data = {};
         // Series keyed by name where each timestep should
         // be present aka non-sparse
+        this.highlightBoxes = [];
     }
 
     xRange(domain) {
@@ -35,12 +36,16 @@ class Chart {
                     .map(k => this.data[k].reduce((p, c) => Math.max(p, c)))
                     .reduce((p, c) => Math.max(p, c), 0);
             }
+
+            ctx.fillStyle = 'rgba(40, 40, 210, 0.25)'
+            for (let i = 0, l = this.highlightBoxes.length; i < l; i++) {
+                const box = this.highlightBoxes[i];
+                ctx.fillRect(this.xRange(box[0] - 0.5), this.y, this.xRange(1), this.height);
+            }
+
             for (let i = 0; i < keys.length; i++) {
                 let key = keys[i];
                 let data = this.data[key].slice();
-                //const keyIndex = key.indexOf('_');
-                //const imageKey = keyIndex > -1 ? key.slice(keyIndex+1, key.length) : null;
-
                 ctx.strokeStyle = utility.colors[i];
                 ctx.beginPath();
                 ctx.moveTo(this.xRange(0), this.yRange(data.shift()));
@@ -51,15 +56,14 @@ class Chart {
                 ctx.stroke();
             }
 
-            /*
-            if (this.title) utility.strokeText(ctx, this.title, x + 50, y);
-            utility.strokeText(ctx, this.yDomainEnd, x - 2, y + fontSize / 2, true);*/
-            ctx.beginPath();
+            //if (this.title) utility.strokeText(ctx, this.title, x + 50, y);
             ctx.strokeStyle = 'black';
+            utility.strokeText(ctx, this.yDomainEnd, x + 50, y + fontSize, true);
+            ctx.beginPath();
             utility.strokeLines(ctx, [[x, y], [x, y + this.height], [x + this.width, y + this.height]]);
 
             if (keys.length > 100) {
-                const dataMin = 35;
+                const dataMin = 30;
                 for (let i = 0, l = this.data[keys[0]].length; i < l; i++) {
                     let dataSorted = keys.map(k => [k, this.data[k][i]]).sort((a, b) => b[1] - a[1]);
                     if (dataSorted[0][1] > dataMin) {

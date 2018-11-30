@@ -4,7 +4,7 @@
     <script src='./chart.js' type='text/javascript'></script>
     <script src='./utility.js' type='text/javascript'></script>
 </head>
-<body bgcolor="#24AF69">
+<body style="background-color: #201029; color: #FFF;">
     <table>
         <tr>
             <td>
@@ -36,9 +36,8 @@
         const timelineHighlight = document.getElementById("timelineHighlight");
         const videoElement = document.querySelector("video");
 
-
         const canvas_width = 1080,
-            canvas_height = 345;
+            canvas_height = 450;
         const canvas = utility.canvasCreate("canvasContainer", "hexBackground", { width: canvas_width + 20, height: canvas_height });
         const ctx = canvas.getContext("2d");
 
@@ -60,8 +59,8 @@
 
         let videoMetaData;
         function init() {
-            charts.push(new Chart({ x: 0, y: 0, width: canvas_width, height: 150 }));
-            charts.push(new Chart({ x: 0, y: 150, width: canvas_width, height: 150 }));
+            charts.push(new Chart({ x: 0, y: 0, width: canvas_width, height: 250 }));
+            charts.push(new Chart({ x: 0, y: 250, width: canvas_width, height: 150 }));
             let messagesLoadedResolve;
             loadingPromises.push(
                 new Promise((resolve, reject) => {
@@ -79,7 +78,7 @@
             fetch('videos.json')
                 .then(response => response.json())
                 .then(videos => {
-                    let video = videos.videos[0];
+                    let video = videos.videos[1];
                     videoElement.setAttribute('src', './' + video.source);
                     return video;
                 })
@@ -91,9 +90,6 @@
                             rawMessageData = messages;
                             currentMessageTime = xDomainStart = startTimeChatMS = +messages[0].time;
                             xDomainEnd = endTimeChatMS = +messages[messages.length - 1].time;
-                            bucketsCreate();
-                            chartsBuild();
-                            display();
                             messagesLoadedResolve();
                         });
                 })
@@ -108,6 +104,12 @@
                     const chatVideoSyncDiffSec = ((startTimeChatMS - videoStartTimeMS) / 1000);
                     const chatVideoSyncTime = videoDuration + (chatVideoSyncDiffSec - videoLength);
                     videoElement.currentTime = startTimeSec = chatVideoSyncTime;
+
+                    const maxChatTime = startTimeChatMS + (videoLength - chatVideoSyncDiffSec) * 1000;
+                    xDomainEnd = endTimeChatMS = endTimeChatMS > maxChatTime ? maxChatTime : endTimeChatMS;
+                    bucketsCreate();
+                    chartsBuild();
+                    display();
                 });
 
             keyDownEvents[39] = () => timelineMoveForward();
@@ -177,11 +179,38 @@
         }
 
         function chartsBuild() {
+            const stats = seriesStats(buckets.map(b => b.messages));
+            console.log(...stats)
+            const mean = [],
+                upper = [],
+                upperupper = [];
+            const bucketHistory = 12;
+            for (let i = 0, l = buckets.length; i < l; i++) {
+                const s = seriesStats(
+                    buckets.slice((i-bucketHistory < 0) ? 0 : (i - bucketHistory), i+1)
+                        .map(b => b.messages + b.emoteCount)
+                );
+
+                mean.push(s[0]);
+                upper.push(s[0] + s[1]);
+                upperupper.push(s[0] + s[1]+ s[1]);
+            }
+
+
+
             charts[0].data = {
                 0: buckets.map(b => b.messages),
                 1: buckets.map(b => b.users.size),
                 2: buckets.map(b => b.emoteCount),
+                //3: buckets.map(b => b.messages + b.emoteCount),
+                //10: buckets.map(b => stats[0]),
+                //11: buckets.map(b => stats[0] + stats[1]),
+                //4: mean,
+                //6: upperupper,
             };
+
+            charts[0].highlightBoxes = buckets.map((b, i) => [i, b.messages + b.emoteCount])
+                .filter((b, i) => b[1] > upperupper[i]);
 
             let emoteLines = [];
             charts[1].data = {};
@@ -195,6 +224,31 @@
                     charts[1].data[i + '_' + k] = arr;
                 }
                 );
+        }
+
+        function seriesStats(values) {
+            var mean = values.reduce((p, c) => p + c, 0) / values.length;
+            //var median = values.slice().sort((a, b) => a - b)[Math.floor(values.length / 2)];
+
+            var diffs = values.map(v => (v - mean) * (v - mean));
+            var diffAvg = diffs.reduce((p, c) => p + c, 0) / diffs.length;
+            var stDev = Math.sqrt(diffAvg)
+
+            /*var mdiffs = values.map(v => (v - median) * (v - median));
+            var mdiffAvg = mdiffs.reduce((p, c) => p + c, 0) / mdiffs.length;
+            var mstDev = Math.sqrt(mdiffAvg)*/
+
+            return [mean, stDev];
+
+            const vMin = Math.min(...values);
+            const vMax = Math.max(...values)
+            console.log('Count', 'Min', 'Max', 'Mean', 'StDev');
+            console.log(values.length, vMin, vMax, mean, stDev);
+            console.log('Below', 'Within', 'Above');
+
+            const below = values.filter(v => v < (mean - stDev)).length;
+            const above = values.filter(v => v > (mean + stDev)).length;
+            console.log(below, values.length - (below + above), above);
         }
 
         function updateTimelineHighlight() {
