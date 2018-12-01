@@ -32,11 +32,11 @@ class Chart {
                 y = this.y;
             if (!this.yDomainEnd) {
                 this.yDomainEnd = keys
-                    .map(k => this.data[k].reduce((p, c) => Math.max(p, c)))
+                    .map(k => this.data[k].reduce((p, c) => Math.max(p, c), 0))
                     .reduce((p, c) => Math.max(p, c), 0);
             }
 
-            ctx.fillStyle = 'rgba(40, 40, 210, 0.25)';
+            ctx.fillStyle = 'rgba(120, 40, 120, 0.1)';
             for (let i = 0, l = this.highlightBoxes.length; i < l; i++) {
                 const box = this.highlightBoxes[i];
                 ctx.fillRect(this.xRange(box[0] - 0.5), this.y, this.xRange(1), this.height);
@@ -56,7 +56,7 @@ class Chart {
             }
 
             ctx.strokeStyle = 'black';
-            utility.strokeText(ctx, this.yDomainEnd, x + 50, y + fontSize, true);
+            utility.strokeText(ctx, this.yDomainEnd.toFixed(0), x + 65, y + 20, true);
             ctx.beginPath();
             utility.strokeLines(ctx, [[x, y], [x, y + this.height], [x + this.width, y + this.height]]);
 
@@ -70,7 +70,8 @@ class Chart {
                         img.src = `./images/${id.slice(id.indexOf('_') +1, id.length)}.png`;
 
                         img.onload = () => {
-                            ctx.drawImage(img, this.xRange(i + 1), this.y + this.height + 5 * (i % 5), 25, 25);
+                            const imageSize = 25;
+                            ctx.drawImage(img, this.xRange(i + 1) - imageSize/2, this.y + this.height + 5 * (i % 5), imageSize, imageSize);
                         }
                     }
                 }

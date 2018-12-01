@@ -24,6 +24,7 @@
                             <button onclick="videoElement.pause(); clearTimeout(highlightTimeoutId);">PAUSE</button>
                             <br />
                             <button onclick="videoElement.playbackRate = 3.0;">3X</button>
+                            <button onclick="videoElement.playbackRate = 2.0;">2X</button>
                             <button onclick="videoElement.playbackRate = 1.0;">1X</button>
                             <button onclick="videoElement.playbackRate = 0.5;">.5X</button>
                             <br />
@@ -35,8 +36,12 @@
         </tr>
     </table>
     <div id="canvasContainer"></div>
-    <script type="text/javascript">
+    <script src="./highlights.js"></script>
+    <script type="module">
         'use strict';
+        import Messages from './highlights.js';
+        let messageManager = null;
+
         const loadingPromises = [];
         const timelineHighlight = document.getElementById("timelineHighlight");
         const videoElement = document.querySelector("video");
@@ -55,7 +60,6 @@
             bucket_duration_sec = bucket_duration_ms / 1000;
 
         let rawMessageData = null;
-        const emoteKeys = new Set();
             
         let startTimeChatMS, endTimeChatMS,
             xDomainStart, xDomainEnd,
@@ -79,7 +83,7 @@
                     videos.videos.forEach(v => {
                         const o = document.createElement('option');
                         o.value = v._id;
-                        o.innerHTML = v.channel;
+                        o.innerHTML = v.channel.display_name + ' | ' + v.game;
                         vSelect.appendChild(o);
                     })
 
@@ -119,9 +123,12 @@
             fetch(video.messages)
                 .then(response => response.json())
                 .then(messages => {
+                    messageManager = new Messages(messages);
+
                     rawMessageData = messages;
                     currentMessageTime = xDomainStart = startTimeChatMS = +messages[0].time;
                     xDomainEnd = endTimeChatMS = +messages[messages.length - 1].time;
+
                     charts.length = 0;
                     charts.push(new Chart({ x: 0, y: 0, width: canvas_width, height: 250 }));
                     charts.push(new Chart({ x: 0, y: 250, width: canvas_width, height: 150 }));
@@ -177,46 +184,12 @@
         }
 
         function bucketsCreate(duration = bucket_duration_ms) {
-            const bucketCreationStartTime = performance.now();
             buckets.length = 0;
-            for (let t = xDomainStart; t <= xDomainEnd; t += duration) {
-                buckets.push({
-                    start: +t,
-                    end: +t + duration,
-                    users: new Set(),
-                    emotes: {},
-                    emotesNoSpam: {},
-                    emoteCount: 0,
-                    messages: 0
-                });
-            }
-
-            let bucket = buckets[0];
-            for (let i = 0, l = rawMessageData.length; i < l; i++) {
-                const d = rawMessageData[i];
-                if (d.time < bucket.start) {
-                    continue;
-                } else if (d.time > bucket.end) {
-                    bucket = buckets.filter(b => b.start <= d.time && d.time < b.end)[0];
-                }
-
-                if (!bucket) {
-                    break;
-                }
-
-                bucket.messages++;
-                bucket.users.add(d.user);
-                bucket.emoteCount += Object.keys(d.emotes).reduce((p, c) => p + d.emotes[c], 0);
-                for (let key in d.emotes) {
-                    emoteKeys.add(key);
-                    bucket.emotes[key] = bucket.emotes[key] || 0;
-                    bucket.emotes[key] += d.emotes[key];
-                    bucket.emotesNoSpam[key] = bucket.emotesNoSpam[key] || 0;
-                    bucket.emotesNoSpam[key]++;
-                }
-            }
-
-            console.log('Bucket Creation Compute:', ((performance.now() - bucketCreationStartTime) / 1000 / 60).toFixed(2), 'seconds');
+            buckets.push(...messageManager.bucketsByMessagesCreate({
+                bucket_duration: duration,
+                start_time: xDomainStart,
+                end_time: xDomainEnd
+            }));
         }
 
         function chartsBuild() {
@@ -231,68 +204,63 @@
                         .map(b => b.messages + b.emoteCount)
                 );
 
-                mean.push(s[0]);
-                upper.push(s[0] + s[1]);
-                upperupper.push(s[0] + s[1]+ s[1]);
+                mean.push(s.mean);
+                upperupper.push(s.mean + s.standard_deviation + s.standard_deviation);
             }
 
             charts[0].data = {
-                0: buckets.map(b => b.messages),
-                1: buckets.map(b => b.users.size),
-                2: buckets.map(b => b.emoteCount),
-                //3: buckets.map(b => b.messages + b.emoteCount),
-                //10: buckets.map(b => stats[0]),
-                //11: buckets.map(b => stats[0] + stats[1]),
-                //4: mean,
-                //6: upperupper,
+                0: buckets.map(b => b.users.size),
+                1: buckets.map(b => b.messages + b.emoteCount),
+                2: mean,
+                3: upperupper,
             };
 
             charts[0].highlightBoxes = highlightBuckets = buckets.map((b, i) => [i, b.messages + b.emoteCount, b])
                 .filter((b, i) => b[1] > upperupper[i]);
 
-            let emoteLines = [];
             charts[1].data = {};
-            Array.from(emoteKeys)
+            Array.from(messageManager.imageKeys)
                 .sort((a, b) =>
-                    buckets.map(u => b in u.emotes ? u.emotes[b] : 0).reduce((p, c) => p + c, 0) - buckets.map(u => a in u.emotes ? u.emotes[a] : 0).reduce((p, c) => p + c, 0)
+                    buckets.map(u => b in u.emotes ? u.emotes[b] : 0)
+                        .reduce((p, c) => p + c, 0)
+                    - buckets.map(u => a in u.emotes ? u.emotes[a] : 0)
+                        .reduce((p, c) => p + c, 0)
                 )
                 .forEach((k, i) => {
                     const arr = buckets.map(b => k in b.emotes ? b.emotes[k] : 0);
-                    emoteLines.push(arr);
                     charts[1].data[i + '_' + k] = arr;
                 }
-                );
+            );
         }
 
         function seriesStats(values) {
-            var mean = values.reduce((p, c) => p + c, 0) / values.length;
-            //var median = values.slice().sort((a, b) => a - b)[Math.floor(values.length / 2)];
+            const count = values.length;
+            const mean = values.reduce((p, c) => p + c, 0) / count;
+            const median = values.slice()
+                .sort((a, b) => a - b)[Math.floor(count / 2)];
 
-            var diffs = values.map(v => (v - mean) * (v - mean));
-            var diffAvg = diffs.reduce((p, c) => p + c, 0) / diffs.length;
-            var stDev = Math.sqrt(diffAvg)
-
-            /*var mdiffs = values.map(v => (v - median) * (v - median));
-            var mdiffAvg = mdiffs.reduce((p, c) => p + c, 0) / mdiffs.length;
-            var mstDev = Math.sqrt(mdiffAvg)*/
-
-            return [mean, stDev];
+            const stDev = Math.sqrt(
+                values.map(v => (v - mean) * (v - mean))
+                    .reduce((p, c) => p + c, 0)
+                / count
+            );
 
             const vMin = Math.min(...values);
             const vMax = Math.max(...values)
-            console.log('Count', 'Min', 'Max', 'Mean', 'StDev');
-            console.log(values.length, vMin, vMax, mean, stDev);
-            console.log('Below', 'Within', 'Above');
 
-            const below = values.filter(v => v < (mean - stDev)).length;
-            const above = values.filter(v => v > (mean + stDev)).length;
-            console.log(below, values.length - (below + above), above);
+            return {
+                mean: mean,
+                median: median,
+                standard_deviation: stDev,
+                minimum: vMin,
+                maximum: vMax,
+                count: count
+            };
         }
 
         function updateTimelineHighlight() {
             const start = currentMessageTime - bucket_duration_ms / 2,
                 end = currentMessageTime + bucket_duration_ms / 2;
-
             const timeRangeData = rawMessageData.filter(d => d.time >= start && d.time < end);
 
             let messages = 0,
@@ -331,16 +299,14 @@
         function timelineMoveBackward() {
             const sec = bucket_duration_sec / 2,
                 ms = bucket_duration_ms / 2;
-            if (videoElement.currentTime - sec < startTimeSec) {
+            videoElement.currentTime -= sec;
+            if (videoElement.currentTime < startTimeSec) {
                 videoElement.currentTime = startTimeSec;
-            } else {
-                videoElement.currentTime -= sec;
             }
 
-            if (currentMessageTime - ms < startTimeChatMS) {
+            currentMessageTime -= ms;
+            if (currentMessageTime < startTimeChatMS) {
                 currentMessageTime = startTimeChatMS;
-            } else {
-                currentMessageTime -= ms;
             }
 
             display();
@@ -350,27 +316,29 @@
         function timelineMoveForward() {
             const sec = bucket_duration_sec / 2,
                 ms = bucket_duration_ms / 2;
-            if (videoElement.currentTime + sec > videoElement.duration) {
+            videoElement.currentTime += sec;
+            if (videoElement.currentTime > videoElement.duration) {
                 videoElement.currentTime = videoElement.duration;
-            } else {
-                videoElement.currentTime += sec;
             }
 
-            if (currentMessageTime + ms > endTimeChatMS) {
+            currentMessageTime += ms;
+            if (currentMessageTime > endTimeChatMS) {
                 currentMessageTime = endTimeChatMS;
-            } else {
-                currentMessageTime += ms;
             }
 
             display();
             updateTimelineHighlight();
         }
 
-        canvas.addEventListener("mousedown", event => {
+        function xyFromMouseEvent(event) {
             const canvas_bounds = canvas.getBoundingClientRect();
-            let y = event.clientY - canvas_bounds.top,
+            const y = event.clientY - canvas_bounds.top,
                 x = event.clientX - canvas_bounds.left;
+            return [x, y]
+        }
 
+        canvas.addEventListener("mousedown", event => {
+            let x, y; [x, y] = xyFromMouseEvent(event);
             const xTime = xToTime(x);
 
             videoElement.currentTime = xTime.video;
@@ -380,9 +348,7 @@
         });
 
         canvas.addEventListener('wheel', event => {
-            const canvas_bounds = canvas.getBoundingClientRect();
-            const y = event.clientY - canvas_bounds.top,
-                x = event.clientX - canvas_bounds.left;
+            let x, y; [x, y] = xyFromMouseEvent(event);
             const xTime = xToTime(x);
             const xDomainDuration = xDomainEnd - xDomainStart;
 
@@ -433,10 +399,10 @@
             display();
 
             return false;
-        }, false);
+        }, {passive: true});
 
         window.addEventListener("keydown", event => {
-            let f = keyDownEvents[event.keyCode.toString()];
+            const f = keyDownEvents[event.keyCode.toString()];
             if (f) { f(); }
         });
 
@@ -446,31 +412,16 @@
             ctx.fillStyle = 'rgba(240, 0, 0, 0.3)';
             let xVideoTimeStart = (currentMessageTime - xDomainStart - bucket_duration_ms / 2) / (xDomainEnd - xDomainStart) * canvas_width,
                 xVideoTimeEnd = (currentMessageTime - xDomainStart + bucket_duration_ms / 2) / (xDomainEnd - xDomainStart) * canvas_width;
-
-            if (xVideoTimeStart < 0) {
-                xVideoTimeStart = 0;
-            }
-            if (xVideoTimeEnd > canvas_width) {
-                xVideoTimeEnd = canvas_width;
-            }
+            xVideoTimeStart = xVideoTimeStart < 0 ? 0 : xVideoTimeStart;
+            xVideoTimeEnd = xVideoTimeEnd > canvas_width ? canvas_width : xVideoTimeEnd;
             ctx.fillRect(xVideoTimeStart, 0, xVideoTimeEnd - xVideoTimeStart, canvas_height);
-
-            //ctx.beginPath();
-            //const xVideoTime = (videoElement.currentTime - startTimeSec) / (videoElement.duration - startTimeSec) * canvas_width;
-            //ctx.strokeStyle = 'red';
-            //ctx.moveTo(xVideoTime, 0);
-            //ctx.lineTo(xVideoTime, canvas_height);
-            //ctx.stroke();
 
             for (let i = 0, l = charts.length; i < l; i++) {
                 charts[i].display(ctx);
             }
         }
 
-        window.onload = function () {
-            init();
-        }
+        window.onload = () => init();
     </script>
 </body>
-
 </html>
