@@ -59,6 +59,8 @@ class Server {
 
             } else if (parsed.command === "MODE") {
 
+            } else if (parsed.command === "CAP") {
+
             } else if (parsed.command === "PART") {
                 this.channelsByName[channelName].onPart();
                 delete this.channelsByName[channelName];
