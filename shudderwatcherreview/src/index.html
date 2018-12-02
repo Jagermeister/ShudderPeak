@@ -67,7 +67,6 @@
             startTimeSec;
 
         let videosMetaData, videoMetaData;
-        let highlightBuckets;
         let highlightTimeoutId;
 
         let messagesLoadedResolve;
@@ -160,10 +159,9 @@
             const videoCurrentDateTime = videoEndDateTime - videoRemainingTime * 1000;
 
             const leadInTime = 2000;
-            let closestBucket = highlightBuckets.map(b => b[2])
-                .filter(b => videoCurrentDateTime < b.end);
+            let closestBucket = messageManager.bucketsHighlighted.filter(b => videoCurrentDateTime < b.end);
 
-            closestBucket = closestBucket ? closestBucket[0] : highlightBuckets[0];
+            closestBucket = closestBucket ? closestBucket[0] : messageManager.bucketsHighlighted[0];
             if (videoCurrentDateTime < closestBucket.start - leadInTime) {
                 videoElement.currentTime = videoElement.duration - (videoEndDateTime - closestBucket.start - leadInTime) / 1000;
                 currentMessageTime = closestBucket.start - leadInTime;
@@ -185,38 +183,21 @@
 
         function bucketsCreate(duration = bucket_duration_ms) {
             buckets.length = 0;
-            buckets.push(...messageManager.bucketsByMessagesCreate({
+            messageManager.bucketsByMessagesCreate({
                 bucket_duration: duration,
                 start_time: xDomainStart,
                 end_time: xDomainEnd
-            }));
+            })
+            buckets.push(...messageManager.buckets);
         }
 
         function chartsBuild() {
-            const stats = seriesStats(buckets.map(b => b.messages));
-            const mean = [],
-                upper = [],
-                upperupper = [];
-            const bucketHistory = 480 / bucket_duration_sec;
-            for (let i = 0, l = buckets.length; i < l; i++) {
-                const s = seriesStats(
-                    buckets.slice((i-bucketHistory < 0) ? 0 : (i - bucketHistory), i+1)
-                        .map(b => b.messages + b.emoteCount)
-                );
-
-                mean.push(s.mean);
-                upperupper.push(s.mean + s.standard_deviation + s.standard_deviation);
-            }
-
+            messageManager.highlightBuckets();
+            charts[0].highlightBoxes = messageManager.bucketsHighlighted;
             charts[0].data = {
                 0: buckets.map(b => b.users.size),
-                1: buckets.map(b => b.messages + b.emoteCount),
-                2: mean,
-                3: upperupper,
+                1: buckets.map(b => b.messages + b.emoteCount)
             };
-
-            charts[0].highlightBoxes = highlightBuckets = buckets.map((b, i) => [i, b.messages + b.emoteCount, b])
-                .filter((b, i) => b[1] > upperupper[i]);
 
             charts[1].data = {};
             Array.from(messageManager.imageKeys)
@@ -231,31 +212,6 @@
                     charts[1].data[i + '_' + k] = arr;
                 }
             );
-        }
-
-        function seriesStats(values) {
-            const count = values.length;
-            const mean = values.reduce((p, c) => p + c, 0) / count;
-            const median = values.slice()
-                .sort((a, b) => a - b)[Math.floor(count / 2)];
-
-            const stDev = Math.sqrt(
-                values.map(v => (v - mean) * (v - mean))
-                    .reduce((p, c) => p + c, 0)
-                / count
-            );
-
-            const vMin = Math.min(...values);
-            const vMax = Math.max(...values)
-
-            return {
-                mean: mean,
-                median: median,
-                standard_deviation: stDev,
-                minimum: vMin,
-                maximum: vMax,
-                count: count
-            };
         }
 
         function updateTimelineHighlight() {

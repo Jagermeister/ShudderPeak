@@ -39,7 +39,7 @@ class Chart {
             ctx.fillStyle = 'rgba(120, 40, 120, 0.1)';
             for (let i = 0, l = this.highlightBoxes.length; i < l; i++) {
                 const box = this.highlightBoxes[i];
-                ctx.fillRect(this.xRange(box[0] - 0.5), this.y, this.xRange(1), this.height);
+                ctx.fillRect(this.xRange(box.index - 0.5), this.y, this.xRange(1), this.height);
             }
 
             for (let i = 0; i < keys.length; i++) {
