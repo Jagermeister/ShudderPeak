@@ -39,7 +39,7 @@
     <script src="./highlights.js"></script>
     <script type="module">
         'use strict';
-        import Messages from './highlights.js';
+        import Messages from './highlight.js';
         let messageManager = null;
 
         const loadingPromises = [];
@@ -183,7 +183,7 @@
 
         function bucketsCreate(duration = bucket_duration_ms) {
             buckets.length = 0;
-            messageManager.bucketsByMessagesCreate({
+            messageManager.bucketsCreate({
                 bucket_duration: duration,
                 start_time: xDomainStart,
                 end_time: xDomainEnd
@@ -192,7 +192,7 @@
         }
 
         function chartsBuild() {
-            messageManager.highlightBuckets();
+            messageManager.bucketsHighlight();
             charts[0].highlightBoxes = messageManager.bucketsHighlighted;
             charts[0].data = {
                 0: buckets.map(b => b.users.size),

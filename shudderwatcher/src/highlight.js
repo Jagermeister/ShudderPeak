@@ -1,7 +1,7 @@
 const bucketDurationMSDefault = 30000;
 const bucketStatsLookbackMSDefault = 480000;
 
-export default class Messages {
+class Messages {
 
     constructor(messages) {
         this.messages = messages;
@@ -10,10 +10,10 @@ export default class Messages {
         this.bucketsHighlighted = [];
     }
 
-    bucketsByMessagesCreate(options = {}) {
+    bucketsCreate(options = {}) {
         const duration = options.bucket_duration || bucketDurationMSDefault;
-        const domainStart = options.start_time || this.messages[0].time;
-        const domainEnd = options.end_time || this.messages[this.messages.length - 1].time;
+        const domainStart = options.start_time || +this.messages[0].time;
+        const domainEnd = options.end_time || +this.messages[this.messages.length - 1].time;
         this.imageKeys.clear();
 
         console.time('Bucket Creation');
@@ -37,7 +37,7 @@ export default class Messages {
         console.timeEnd('Bucket Creation');
     }
 
-    highlightBuckets(options = {}) {
+    bucketsHighlight(options = {}) {
         const duration = options.bucket_duration || bucketDurationMSDefault;
         const bucketLookback = bucketStatsLookbackMSDefault / duration;
         const upperBound2StDev = [];
@@ -109,3 +109,5 @@ function _seriesStatistics(values) {
         count: count
     };
 }
+
+module.exports = Messages;
