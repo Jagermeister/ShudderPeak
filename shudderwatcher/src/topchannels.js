@@ -3,7 +3,19 @@ const fs = require('fs');
 const config = require('./config.json');
 const chalk = require('chalk');
 
-const viewerMinimumCount = 4000;
+const options = (() => {
+    const arguments = process.argv.slice(2);
+    const parameters = {};
+    arguments.forEach(a => {
+        const keyValue = a.split('=');
+        parameters[keyValue[0]] = keyValue.length > 1 ? keyValue[1] : true;
+    })
+    return parameters;
+})();
+
+const filter = config.streamPreference;
+const viewerMinimumCountDefault = 4000;
+const viewerMinimumCount = config.viewerMinimum ? config.viewerMinimum : viewerMinimumCountDefault;
 
 new Promise((resolve, reject) => {
     fs.readFile('client_secret.json', (err, data) => {
@@ -19,30 +31,26 @@ new Promise((resolve, reject) => {
         };
         request.get(
             `${config.endpoint}${endpoint}?${dictToString(parameters)}`,
-            (err, _, body) => {
-                err ? reject(err) : resolve(JSON.parse(body).streams);
-            }
+            (err, _, body) => err ? reject(err) : resolve(JSON.parse(body).streams)
         );
     });
 }).then(streams => {
-    return new Promise((resolve, reject) => {
-        resolve(streams.map(s => {
-                return {
-                    _id: s._id,
-                    viewers: s.viewers,
-                    created: s.created_at,
-                    game: s.game,
-                    channel: {
-                        _id: s.channel._id,
-                        name: s.channel.name,
-                        views: s.channel.views,
-                        followers: s.channel.followers
-                    }
+    return streams.map(s => {
+            return {
+                _id: s._id,
+                viewers: s.viewers,
+                created: s.created_at,
+                game: s.game,
+                channel: {
+                    _id: s.channel._id,
+                    name: s.channel.name,
+                    views: s.channel.views,
+                    followers: s.channel.followers
                 }
-            }).filter(s => s.viewers > viewerMinimumCount)
-        );
-    });
-}).then(streams => {
+            }
+        }).filter(s => s.viewers > viewerMinimumCount);
+}).then(streams => streams.filter(s => !(filter.gamesDisallowed.includes(s.game) || filter.streamersDisallowed.includes(s.channel.name)))
+).then(streams => {
     const bgColors = [
         chalk.bgBlack.white.bold,
         chalk.bgRed.blue,
