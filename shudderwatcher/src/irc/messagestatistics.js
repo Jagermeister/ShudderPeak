@@ -62,8 +62,13 @@ class MessageStatistics {
 
     reportHighLevel(name) {
         const dateOldest = new Date(+this.data[0].time).toISOString();
+        const msgToUser = this.usersUnique.size ? this.message_count / this.usersUnique.size : null;
+        const msgToUserDisplay = msgToUser ? msgToUser.toFixed(1) + 'x' : '';
+        const emoteMultiplier = this.emotesUnique.size ? this.emote_count / this.emotesUnique.size : null;
+        const emoteMultiplierDisplay = emoteMultiplier ? emoteMultiplier.toFixed(1) + 'x' : '';
+
         console.log(`${name}\t${dateOldest.slice(0, 10)}
->\tU:${this.usersUnique.size}\tM:${this.message_count}\tE:${this.emote_count} (${this.emotesUnique.size})`);
+>M:${('00000'+this.message_count).slice(-5)} (U:${this.usersUnique.size}) [${msgToUserDisplay}]\tE:${this.emote_count} (${this.emotesUnique.size}) [${emoteMultiplierDisplay}]`);
     }
 
     report() {
