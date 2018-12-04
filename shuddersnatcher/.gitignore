@@ -40,6 +40,7 @@ testem.log
 *config.json
 *emoticon_images*.json
 /images
+*.ts
 
 # System Files
 .DS_Store

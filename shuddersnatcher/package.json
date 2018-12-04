@@ -1,5 +1,5 @@
 {
-  "name": "peaksplicer",
+  "name": "shuddersnatcher",
   "version": "1.0.0",
   "description": "From web video to file",
   "main": "index.js",
@@ -17,11 +17,6 @@
   },
   "homepage": "https://github.com/Jagermeister/ShudderPeak#readme",
   "dependencies": {
-    "fs": "0.0.1-security",
-    "http": "0.0.0",
-    "https": "^1.0.0",
-    "puppeteer": "^1.10.0",
-    "querystring": "^0.2.0",
     "request": "^2.88.0"
   }
 }
