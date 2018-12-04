@@ -1,0 +1,27 @@
+{
+  "name": "peaksplicer",
+  "version": "1.0.0",
+  "description": "From web video to file",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jagermeister/ShudderPeak.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Jagermeister/ShudderPeak/issues"
+  },
+  "homepage": "https://github.com/Jagermeister/ShudderPeak#readme",
+  "dependencies": {
+    "fs": "0.0.1-security",
+    "http": "0.0.0",
+    "https": "^1.0.0",
+    "puppeteer": "^1.10.0",
+    "querystring": "^0.2.0",
+    "request": "^2.88.0"
+  }
+}

@@ -39,7 +39,6 @@ testem.log
 *credentials.json
 *config.json
 *emoticon_images*.json
-*.json
 /images
 
 # System Files
