@@ -9,8 +9,7 @@ class Channel {
         let statRef = this.stats;
         let report = () => {
             if (this.stats.data.length) {
-                console.log(channelName, 'Message Report');
-                statRef.report();
+                statRef.reportHighLevel(channelName);
             }
             setTimeout(report, 30000)
         }

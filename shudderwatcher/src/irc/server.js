@@ -1,3 +1,4 @@
+const fs = require('fs');
 const WebSocket = require('ws');
 const config = require('../config.json');
 const Channel = require('./channel.js');
@@ -14,6 +15,18 @@ class Server {
         this.channelsByName = {};
 
         this.serverOnOpenResolve = null;
+
+        setInterval(() => {
+            const channels = Object.keys(this.channelsByName);
+            for (let i = 0, l = channels.length; i < l; i++) {
+                const channel = this.channelsByName[channels[i]];
+                fs.writeFile(
+                    `${channel.channelName}.json`,
+                    JSON.stringify(channel.stats.data),
+                    (err) => { if (err) throw err; }
+                );
+            }
+        }, 60000);
     }
 
     open() {

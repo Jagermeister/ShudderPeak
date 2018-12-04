@@ -20,6 +20,9 @@ class MessageStatistics {
 
         this.data = [];
         this.message_count = 0;
+        this.emote_count = 0;
+        this.usersUnique = new Set();
+        this.emotesUnique = new Set();
 
         this.emoteRegex = /emotes=(.*?);/;
         this.timeRegex = /tmi-sent-ts=(.*?);/;
@@ -43,15 +46,24 @@ class MessageStatistics {
                 const eId = emoteParts[0];
                 const eCount = emoteParts[1].split(',').length;
                 emoteCountsById[eId] = eCount;
+                this.emotesUnique.add(eId);
+                this.emote_count += eCount;
             });
         }
 
         this.message_count++;
+        this.usersUnique.add(username);
         this.data.push({
             time: timestamp,
             user: username,
             emotes: emoteCountsById
         });
+    }
+
+    reportHighLevel(name) {
+        const dateOldest = new Date(+this.data[0].time).toISOString();
+        console.log(`${name}\t${dateOldest.slice(0, 10)}
+>\tU:${this.usersUnique.size}\tM:${this.message_count}\tE:${this.emote_count} (${this.emotesUnique.size})`);
     }
 
     report() {
