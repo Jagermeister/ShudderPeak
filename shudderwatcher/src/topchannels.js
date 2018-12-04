@@ -1,7 +1,5 @@
-const request = require('request');
-const fs = require('fs');
-const config = require('./config.json');
 const chalk = require('chalk');
+const api = require('./api.js');
 
 const options = (() => {
     const arguments = process.argv.slice(2);
@@ -13,44 +11,7 @@ const options = (() => {
     return parameters;
 })();
 
-const filter = config.streamPreference;
-const viewerMinimumCountDefault = 4000;
-const viewerMinimumCount = config.viewerMinimum ? config.viewerMinimum : viewerMinimumCountDefault;
-
-new Promise((resolve, reject) => {
-    fs.readFile('client_secret.json', (err, data) => {
-        err ? reject(err) : resolve(JSON.parse(data));
-    });
-}).then(token => {
-    return new Promise((resolve, reject) => {
-        const endpoint = 'streams/'
-        const parameters = {
-            'limit': '50',
-            'language': 'en',
-            'client_id': token.client_id
-        };
-        request.get(
-            `${config.endpoint}${endpoint}?${dictToString(parameters)}`,
-            (err, _, body) => err ? reject(err) : resolve(JSON.parse(body).streams)
-        );
-    });
-}).then(streams => {
-    return streams.map(s => {
-            return {
-                _id: s._id,
-                viewers: s.viewers,
-                created: s.created_at,
-                game: s.game,
-                channel: {
-                    _id: s.channel._id,
-                    name: s.channel.name,
-                    views: s.channel.views,
-                    followers: s.channel.followers
-                }
-            }
-        }).filter(s => s.viewers > viewerMinimumCount);
-}).then(streams => streams.filter(s => !(filter.gamesDisallowed.includes(s.game) || filter.streamersDisallowed.includes(s.channel.name)))
-).then(streams => {
+api.channelsByViewers().then(streams => {
     const bgColors = [
         chalk.bgBlack.white.bold,
         chalk.bgRed.blue,
