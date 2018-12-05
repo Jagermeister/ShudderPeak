@@ -1,9 +1,10 @@
 const request = require('request');
 const fs = require('fs');
-
 const config = require('./config.json');
+const ffmeg = require('fluent-ffmpeg');
+const concat = require('concat');
 
-download('341159577', null, null);
+download('341159577', 9, 27);
 
 function download(videoId, startTime, endTime) {
     var tokenUrl = config.tokenUrlTemplate
@@ -25,10 +26,21 @@ function download(videoId, startTime, endTime) {
                 return console.log(err);
             }
             var videoUrl = getVideoEndpoint(body);
-            request.get(videoUrl + '/1.ts')
-                .pipe(fs.createWriteStream('1.ts'));
+            var videoSlices = getRangeToDownload(startTime, endTime);
+            var sliceFiles = [];
+            var bundleTsName = 'bundle.ts';
+            fs.createWriteStream(bundleTsName);
+            for(var slice of videoSlices) {
+                var sliceFile = slice + '.ts';
+                sliceFiles.push(sliceFile);
+                request.get(videoUrl + '/' + sliceFile)
+                .pipe(fs.createWriteStream(sliceFile));
+            }
+            setTimeout(5400);
+            concat(sliceFiles, bundleTsName);
+            ffmeg().addInput(bundleTsName).output('bundle.mp4').run();
+            });
         });
-    });
 };
 
 function getVideoEndpoint(body) {
@@ -39,4 +51,13 @@ function getVideoEndpoint(body) {
         }
     }
     return '';
+}
+function getRangeToDownload(start, end) {
+    var range = [];
+    var startBound = Math.trunc(start / 10);
+    var endBound = Math.trunc(end / 10);
+    for(var i = startBound; i < endBound + 1; i ++) {
+        range.push(i + 1);
+    }
+    return range;
 }

@@ -17,6 +17,8 @@
   },
   "homepage": "https://github.com/Jagermeister/ShudderPeak#readme",
   "dependencies": {
+    "concat": "^1.0.3",
+    "fluent-ffmpeg": "^2.1.2",
     "request": "^2.88.0"
   }
 }

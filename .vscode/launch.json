@@ -8,7 +8,7 @@
             "type": "node",
             "request": "launch",
             "name": "Launch Program",
-            "program": "${workspaceFolder}/peaksplicer/clipdl.js"
+            "program": "${workspaceFolder}/shuddersnatcher/clipdl.js"
         },
         {
             "type": "chrome",
