@@ -6,7 +6,7 @@ const api = require('./api.js');
 const IRC = require('./irc/server.js');
 
 let ircServer;
-const channelCountMax = 1;
+const channelCountMax = 6;
 
 const SCOPES = [
     'chat:read',

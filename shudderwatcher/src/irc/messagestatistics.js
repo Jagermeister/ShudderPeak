@@ -22,14 +22,13 @@ class MessageStatistics {
         const emoteCountsById = {};
 
         // Emotes
-        const emoteMatch = data.tags.emotes;
-        if (emoteMatch && emoteMatch[1] !== "") {
+        const emoteTag = data.tags['emotes'];
+        if (emoteTag) {
             // In the format of:
             // 16396:3-11/12006:13-20,22-29/16190:31-39
             // 1217039:69-75/55338:77-86
             // 1039217:0-6
-            const emotes = emoteMatch[1].split('/');
-            emotes.forEach(e => {
+            emoteTag.split('/').forEach(e => {
                 const emoteParts = e.split(':');
                 const eId = emoteParts[0];
                 const eCount = emoteParts[1].split(',').length;

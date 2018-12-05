@@ -72,8 +72,7 @@ class Server {
             } else if (parsed.command === "CLEARMSG") {
                 //> @login=<login>;target-msg-id=<target-msg-id> :<host> CLEARMSG #<channel> :<message>
             } else if (parsed.command === "MODE") {
-
-                console.log(message)
+                // :<host> MODE #<channel> +o <user>\r\n
             } else if (parsed.command === "CAP") {
                 //:<host> CAP * ACK :./tags ./commands ./membership\r\n'
             } else if (parsed.command === "PART") {
@@ -131,7 +130,7 @@ class Server {
             const tags = parts.shift().slice(1).split(';');
             tags.forEach(t => {
                 const keyValue = t.split('=');
-                parsedMessage.tags[keyValue[0]] = keyValue[1] ? keyValue[1] : true;
+                parsedMessage.tags[keyValue[0]] = keyValue[1];
             });
         }
 
