@@ -46,7 +46,8 @@ function channelsFetch(channelCount) {
         fs.readFile('./config.json', (err, data) => err ? reject(err) : resolve(JSON.parse(data).streamPreference))
     }).then(filter => api.channelsByViewers()
         .then(streams => {
-            console.log(`3. Fetching new channels... ${channelCount} from ${streams.length}`)
+            console.log(`3. Fetching new channels... ${channelCount} from ${streams.length}`);
+            const serverChannels = Object.keys(ircServer.channelsByName);
             const channels = [];
             for (let i = 0, l = streams.length; i < l; i++) {
                 if (channels.length == channelCount) {
@@ -54,7 +55,7 @@ function channelsFetch(channelCount) {
                 }
 
                 const stream = streams[i];
-                if (filter.gamesFavored.includes(stream.game)) {
+                if (filter.gamesFavored.includes(stream.game) && !serverChannels.includes(stream.channel.name)) {
                     channels.push(stream);
                 }
             }
@@ -65,7 +66,7 @@ function channelsFetch(channelCount) {
 }
 
 function removeDeadChannels() {
-    const serverChannels = Object.keys(ircServer.channelsByName)
+    const serverChannels = Object.keys(ircServer.channelsByName);
     return api.channelsStatusByName(serverChannels)
         .then((channels) => {
             const channelNames = channels.map(c => c.channel);
