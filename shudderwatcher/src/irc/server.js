@@ -1,4 +1,3 @@
-const fs = require('fs');
 const WebSocket = require('ws');
 const config = require('../config.json');
 const Channel = require('./channel.js');
@@ -13,6 +12,7 @@ class Server {
         this.webSocket = null;
 
         this.channelsByName = {};
+        this.streamByChannelName = {};
 
         this.serverOnOpenResolve = null;
 
@@ -20,11 +20,7 @@ class Server {
             const channels = Object.keys(this.channelsByName);
             for (let i = 0, l = channels.length; i < l; i++) {
                 const channel = this.channelsByName[channels[i]];
-                fs.writeFile(
-                    `${channel.channelName}.json`,
-                    JSON.stringify(channel.stats.data),
-                    (err) => { if (err) throw err; }
-                );
+                channel.writeFile();
             }
         }, 60000);
     }
@@ -34,7 +30,7 @@ class Server {
         this.webSocket.onmessage = this.onMessage.bind(this);
         this.webSocket.onerror = (msg) => console.log('Error:', msg);
         this.webSocket.onclose = () => {
-            console.log('Disconnected')
+            console.log('Disconnected');
             process.exit();
         };
         this.webSocket.onopen = this.onOpen.bind(this);
@@ -44,9 +40,10 @@ class Server {
         })
     }
 
-    join(channelName) {
+    join(channelName, stream) {
         if (!(channelName in this.channelsByName)) {
-            this.send({ command: "Join Channel", message: `JOIN ${channelName}` });
+            this.streamByChannelName[channelName] = stream;
+            this.send({ command: "Join Channel", message: `JOIN #${channelName}` });
         } else {
             console.log('Already joined channel', channelName);
         }
@@ -54,7 +51,8 @@ class Server {
 
     part(channelName) {
         if (channelName in this.channelsByName) {
-            this.send({ command: "Depart Channel", message: `PART ${channelName}` });
+            return this.channelsByName[channelName].writeFile()
+                .then(() => this.send({ command: "Depart Channel", message: `PART #${channelName}` }));
         } else {
             console.log('Cannot leave channel you havent joined', channelName);
         }
@@ -64,32 +62,45 @@ class Server {
         if (message !== null) {
             var parsed = this.parseMessage(message.data);
             if (parsed.command === "PRIVMSG") {
+                //> @badges=<badges>;color=<color>;display-name=<display-name>;emotes=<emotes>;id=<id-of-msg>;mod=<mod>;room-id=<room-id>;subscriber=<subscriber>;tmi-sent-ts=<timestamp>;turbo=<turbo>;user-id=<user-id>;user-type=<user-type> :<user>!<user>@<user>..... PRIVMSG #<channel> :<message>
                 if (parsed.channel in this.channelsByName) {
                     const channel = this.channelsByName[parsed.channel];
                     channel.onMessage(parsed);
                 }
             } else if (parsed.command === "CLEARCHAT") {
-
+                // @ban-duration=<ban-duration> :<host> CLEARCHAT #<channel> :<user>
+            } else if (parsed.command === "CLEARMSG") {
+                //> @login=<login>;target-msg-id=<target-msg-id> :<host> CLEARMSG #<channel> :<message>
             } else if (parsed.command === "MODE") {
 
+                console.log(message)
             } else if (parsed.command === "CAP") {
-
+                //:<host> CAP * ACK :./tags ./commands ./membership\r\n'
             } else if (parsed.command === "PART") {
+                const channelName = parsed.channel;
                 this.channelsByName[channelName].onPart();
                 delete this.channelsByName[channelName];
             } else if (parsed.command === "JOIN") {
-                const channelName = parsed.channel.slice(0, -2);
-                this.channelsByName[channelName] = new Channel(channelName);
+                const channelName = parsed.channel;
+                const stream = this.streamByChannelName[channelName];
+                this.channelsByName[channelName] = new Channel(channelName, stream);
+                delete this.streamByChannelName[channelName];
             } else if (parsed.command === "USERSTATE") {
-                //@badges=;color=#8A2BE2;display-name=username;emote-sets=0;mod=0;subscriber=0;user-type= :tmi.twitch.tv USERSTATE #channelname
+                //> @badges=<badges>;color=<color>;display-name=<display-name>;emote-sets=<emotes>;mod=<mod>;subscriber=<subscriber>;turbo=<turbo>;user-type=<user-type> :<host> USERSTATE #<channel>
+            } else if (parsed.command === "GLOBALUSERSTATE") {
+                //> @badges=<badges>;color=<color>;display-name=<display-name>;emote-sets=<emote-sets>;turbo=<turbo>;user-id=<user-id>;user-type=<user-type> :<host> GLOBALUSERSTATE
             } else if (parsed.command === "ROOMSTATE") {
-                //@broadcaster-lang=;emote-only=0;followers-only=30;r9k=0;rituals=0;room-id=15564828;slow=0;subs-only=1 :tmi.twitch.tv ROOMSTATE #channelname
+                //> @broadcaster-lang=<broadcaster-lang>;emote-only=<emote-only>;followers-only=<followers-only>;r9k=<r9k>;slow=<slow>;subs-only=<subs-only> :<host> ROOMSTATE #<channel>
             } else if (parsed.command === "001") {
-                // Welcome
+                /*  :<host> 001 <user> :-\r\n:<host> 002 <user> :-<host>\r\n:<host> 003 <user> :-\r\n:<host> 004 <user> :-\r\n
+                    :<host> 375 <user> :-\r\n:<host> 372 <user> :-\r\n:<host> 376 <user> :>\r\n*/
             } else if (parsed.command === "353") {
-                // Name list of mods?
+                // :<user>.<host> 353 <user> = #<channel> :<channel>\r\n
+                // :<user>.<host> 353 <user> = #<channel> :<user>\r\n
+                // :<user>.<host> 366 <user> #<channel> :End of /NAMES list\r\n
+                // :<host> MODE #<channel> +o <channel>\r\n
             } else if (parsed.command === "USERNOTICE") {
-                //@badges=subscriber/3,sub-gifter/1;color=;display-name=adamblevins316;emotes=;flags=;id=feed67dd-4c20-4233-adf3-e9a2e427a08e;login=adamblevins316;mod=0;msg-id=resub;msg-param-months=4;msg-param-sub-plan-name=Channel\sSubscription\s(Nickmercs);msg-param-sub-plan=1000;room-id=15564828;subscriber=1;system-msg=adamblevins316\sjust\ssubscribed\swith\sa\sTier\s1\ssub.\sadamblevins316\ssubscribed\sfor\s4\smonths\sin\sa\srow!;tmi-sent-ts=1543204589073;turbo=0;user-id=199805492;user-type= :tmi.twitch.tv USERNOTICE #channelname :pogs homie
+                //> @badges=<badges>;color=<color>;display-name=<display-name>;emotes=<emotes>;id=<id-of-msg>;login=<user>;mod=<mod>;msg-id=<msg-id>;room-id=<room-id>;subscriber=<subscriber>;system-msg=<system-msg>;tmi-sent-ts=<timestamp>;turbo=<turbo>;user-id=<user-id>;user-type=<user-type> :<host> USERNOTICE #<channel> :<message>
             } else if (parsed.command === "PING") {
                 this.send({ command: 'Connection Keep Alive', message: `PONG :${parsed.message}` });
             } else {
@@ -101,44 +112,46 @@ class Server {
     parseMessage(rawMessage) {
         var parsedMessage = {
             message: null,
-            tags: null,
+            tags: {},
             command: null,
             channel: null,
             username: null
         };
 
-        if (rawMessage[0] === '@') {
-            const tagIndex = rawMessage.indexOf(' '),
-                userIndex = rawMessage.indexOf(' ', tagIndex + 1),
-                commandIndex = rawMessage.indexOf(' ', userIndex + 1),
-                channelIndex = rawMessage.indexOf(' ', commandIndex + 1),
-                messageIndex = rawMessage.indexOf(':', channelIndex + 1);
+        if (rawMessage.startsWith("PING")) {
+            return { command: "PING", message: rawMessage.split(':')[1] };
+        }
 
-            parsedMessage.tags = rawMessage.slice(0, tagIndex);
-            parsedMessage.username = rawMessage.slice(tagIndex + 2, rawMessage.indexOf('!'));
-            parsedMessage.command = rawMessage.slice(userIndex + 1, commandIndex);
-            parsedMessage.channel = rawMessage.slice(commandIndex + 1, channelIndex);
-            parsedMessage.message = rawMessage.slice(messageIndex + 1);
-        } else if (rawMessage.startsWith("PING")) {
-            parsedMessage.command = "PING";
-            parsedMessage.message = rawMessage.split(":")[1];
-        } else {
-            try {
-                const usernameIndex = rawMessage.indexOf('!');
-                if (usernameIndex > -1) {
-                    this.parseMessage.username = rawMessage.slice(1, usernameIndex);
-                }
-                const components = rawMessage.split(' ');
-                parsedMessage.command = components[1];
-                parsedMessage.channel = components[2];
-                if (components.length >= 4) {
-                    parsedMessage.message = components[3].split(":")[1];
-                }
-            } catch(e){
-                console.log('ERROR', rawMessage)
+        const tagID = '@',
+            prefixID = ':',
+            channelID = '#';
+
+        const parts = rawMessage.replace(/\r\n/g, '').split(' ');
+        if (rawMessage[0] === tagID) {
+            const tags = parts.shift().slice(1).split(';');
+            tags.forEach(t => {
+                const keyValue = t.split('=');
+                parsedMessage.tags[keyValue[0]] = keyValue[1] ? keyValue[1] : true;
+            });
+        }
+
+        if (parts.length && parts[0][0] === prefixID) {
+            const prefix = parts.shift();
+            const userID = '!',
+                userIndex = prefix.indexOf(userID);
+            if (userIndex > -1) {
+                parsedMessage.username = prefix.slice(1, userIndex);
             }
         }
 
+        if (parts.length) parsedMessage.command = parts.shift();
+
+        if (parts.length && parts[0][0] === channelID) {
+            const channel = parts.shift();
+            parsedMessage.channel = channel.slice(1);
+        }
+
+        parsedMessage.message = parts.join(' ').slice(1);
         return parsedMessage;
     }
 
@@ -158,7 +171,7 @@ class Server {
     send(message) {
         var socket = this.webSocket;
         if (socket !== null && socket.readyState === 1) {
-            console.log('<<<', message.command, message.command == "Set Password" ? 'PASS oauth:********' : message.message);
+            console.log('<IRC', message.command, message.command == "Set Password" ? 'PASS oauth:********' : message.message);
             socket.send(message.message);
         } else {
             console.log('!!!', 'Socket not ready - Unable to send message: ', message);

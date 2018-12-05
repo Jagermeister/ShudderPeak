@@ -69,7 +69,3 @@ api.channelsByViewers().then(streams => {
         console.log(('000000'+stats.viewers).slice(-6), ('00'+stats.streamers).slice(-2), `\t[${gameStyle(gameName)}]`);
     });
 });
-
-function dictToString(dict) {
-    return Object.keys(dict).map(k => `${k}=${dict[k]}`).join('&');
-}

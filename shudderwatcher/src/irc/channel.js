@@ -1,8 +1,11 @@
+const fs = require('fs');
 const MessageStatistics = require('./messagestatistics.js');
 
 class Channel {
-    constructor(channelName) {
+    constructor(channelName, stream) {
         this.channelName = channelName;
+        this.stream = stream;
+        this.joined_time = new Date().getTime();
         this.stats = new MessageStatistics();
         //TODO: Download channel emote set
 
@@ -11,7 +14,7 @@ class Channel {
             if (this.stats.data.length) {
                 statRef.reportHighLevel(channelName);
             }
-            setTimeout(report, 30000)
+            this.reportTimeoutId = setTimeout(report, 30000)
         }
         report();
     }
@@ -21,8 +24,22 @@ class Channel {
     }
 
     onPart() {
-        console.log('Leaving channel.. final report');
+        console.log(`Leaving ${this.channelName}.. final report`);
         this.stats.report();
+    }
+
+    filename() {
+        return `${this.channelName}_${this.joined_time}_${this.stream.created}_${this.stream.game}.json`;
+    }
+
+    writeFile() {
+        return new Promise((resolve, reject) => {
+            fs.writeFile(
+                this.filename(),
+                JSON.stringify(this.stats.data),
+                err => err ? reject(err) : resolve()
+            )
+        });
     }
 }
 

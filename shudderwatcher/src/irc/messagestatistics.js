@@ -9,32 +9,20 @@ globalEmotes.emoticon_sets['0'].forEach(element => {
 class MessageStatistics {
     constructor() {
         this.bucket_duration_ms = 30000;
-        /*
-        this.bucket_count_max = 10;
-        this.buckets = [{
-            start: Date.now(),
-            users: new Set(),
-        }];
-        this.bucket_count = this.buckets.length;
-        */
-
         this.data = [];
         this.message_count = 0;
         this.emote_count = 0;
         this.usersUnique = new Set();
         this.emotesUnique = new Set();
-
-        this.emoteRegex = /emotes=(.*?);/;
-        this.timeRegex = /tmi-sent-ts=(.*?);/;
     }
 
     observe(data) {
         const username = data.username;
-        const timestamp = this.timeRegex.exec(data.tags)[1];
+        const timestamp = +data.tags['tmi-sent-ts'];
         const emoteCountsById = {};
 
         // Emotes
-        const emoteMatch = this.emoteRegex.exec(data.tags);
+        const emoteMatch = data.tags.emotes;
         if (emoteMatch && emoteMatch[1] !== "") {
             // In the format of:
             // 16396:3-11/12006:13-20,22-29/16190:31-39
@@ -62,21 +50,20 @@ class MessageStatistics {
 
     reportHighLevel(name) {
         const dateOldest = new Date(+this.data[0].time).toISOString();
-        const duration = (+this.data[this.data.length-1].time - +this.data[0].time) / 1000 /60;
+        const duration = (this.data[this.data.length-1].time - this.data[0].time) / 1000 /60;
         const msgToUser = this.usersUnique.size ? this.message_count / this.usersUnique.size : null;
         const msgToUserDisplay = msgToUser ? msgToUser.toFixed(1) + 'x' : '';
         const emoteMultiplier = this.emotesUnique.size ? this.emote_count / this.emotesUnique.size : null;
         const emoteMultiplierDisplay = emoteMultiplier ? emoteMultiplier.toFixed(1) + 'x' : '';
 
-        console.log(`${name.slice(0, 12)}\t${dateOldest.slice(0, 10)}\t${duration.toFixed(1)} Mins
-  M:${('00000'+this.message_count).slice(-5)} (U:${this.usersUnique.size}) [${msgToUserDisplay}]\tE:${this.emote_count} (${this.emotesUnique.size}) [${emoteMultiplierDisplay}]`);
+        console.log(`  ${name.slice(0, 12)}\t${dateOldest.slice(0, 10)}\t${duration.toFixed(1)} Mins
+    M:${('00000'+this.message_count).slice(-5)} (U:${this.usersUnique.size}) [${msgToUserDisplay}]\tE:${this.emote_count} (${this.emotesUnique.size}) [${emoteMultiplierDisplay}]`);
     }
 
     report() {
         if (this.data.length) {
-            const timeMinCutoff = +this.data[0].time;
+            const timeMinCutoff = this.data[0].time;
             const now = Date.now() + this.bucket_duration_ms;
-            //this.data = this.data.filter(d => d.time > timeMinCutoff);
 
             const users = new Set();
             let messageCount = 0,
@@ -134,4 +121,4 @@ class MessageStatistics {
     }
 }
 
-module.exports = MessageStatistics
+module.exports = MessageStatistics;
