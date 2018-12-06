@@ -3,6 +3,7 @@ const fs = require('fs');
 const config = require('./config.json');
 const ffmeg = require('fluent-ffmpeg');
 const concat = require('concat');
+const process = require('child_process');
 
 download('341159577', 9, 27);
 
@@ -28,19 +29,29 @@ function download(videoId, startTime, endTime) {
             var videoUrl = getVideoEndpoint(body);
             var videoSlices = getRangeToDownload(startTime, endTime);
             var sliceFiles = [];
+            var downloads = [];
             var bundleTsName = 'bundle.ts';
             fs.createWriteStream(bundleTsName);
             for(var slice of videoSlices) {
                 var sliceFile = slice + '.ts';
                 sliceFiles.push(sliceFile);
-                request.get(videoUrl + '/' + sliceFile)
-                .pipe(fs.createWriteStream(sliceFile));
-            }
-            setTimeout(5400);
-            concat(sliceFiles, bundleTsName);
-            ffmeg().addInput(bundleTsName).output('bundle.mp4').run();
-            });
+                downloads.push(new Promise(resolve => {
+                    var file = sliceFile;
+                    request.get(videoUrl + '/' + file)
+                .pipe(fs.createWriteStream(file)).on('finish', _ => {
+                    console.log('download of ' + file + ' finished')
+                    resolve();
+                });
+            }));
+        }
+        Promise.all(downloads)
+            .then(_ => {
+                console.log('all download done !');
+                process.execSync('cat ' + sliceFiles.join(' ') + ' > ' + bundleTsName);
+                ffmeg().addInput(bundleTsName).output('bundle.mp4').run();
+            }).catch(error => console.log(error));
         });
+    });
 };
 
 function getVideoEndpoint(body) {
