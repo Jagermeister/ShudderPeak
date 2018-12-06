@@ -2,10 +2,26 @@ const request = require('request');
 const fs = require('fs');
 const config = require('./config.json');
 const ffmeg = require('fluent-ffmpeg');
-const concat = require('concat');
-const process = require('child_process');
 
-download('341159577', 9, 27);
+const options = (() => {
+    const arguments = process.argv.slice(2);
+    const parameters = {};
+    arguments.forEach(a => {
+        const keyValue = a.split('=');
+        parameters[keyValue[0]] = keyValue.length > 1 ? keyValue[1] : true;
+    })
+    return parameters;
+})();
+
+const videoId = options.video;
+const partDownloadDelay = 20000;
+
+new Promise((resolve, reject) =>
+    fs.readFile('./highlight_' + videoId + '.json', (err, data) =>
+        err ? reject(err) : resolve(JSON.parse(data).highlights)
+)).then((highlights =>
+    highlights.forEach((h, i) =>
+        setTimeout(() => download(videoId, h.start, h.end), i * partDownloadDelay))));
 
 function download(videoId, startTime, endTime) {
     var tokenUrl = config.tokenUrlTemplate
@@ -30,27 +46,26 @@ function download(videoId, startTime, endTime) {
             var videoSlices = getRangeToDownload(startTime, endTime);
             var sliceFiles = [];
             var downloads = [];
-            var bundleTsName = 'bundle.ts';
+            var bundleTsName = `${videoId}_${startTime}_${endTime}.ts`;
             fs.createWriteStream(bundleTsName);
-            for(var slice of videoSlices) {
-                var sliceFile = slice + '.ts';
-                sliceFiles.push(sliceFile);
+            for (var slice of videoSlices) {
+                var sliceFile = slice + '.ts',
+                    fileSaveName = `${videoId}_${sliceFile}`
+                sliceFiles.push(fileSaveName);
                 downloads.push(new Promise(resolve => {
-                    var file = sliceFile;
-                    request.get(videoUrl + '/' + file)
-                .pipe(fs.createWriteStream(file)).on('finish', _ => {
-                    console.log('download of ' + file + ' finished')
-                    resolve();
-                });
-            }));
-        }
-        Promise.all(downloads)
-            .then(_ => {
-                console.log('all download done !');
-                concatFiles(sliceFiles, bundleTsName);
-                //process.execSync('cat ' + sliceFiles.join(' ') + ' > ' + bundleTsName);
-                ffmeg().addInput(bundleTsName).output('bundle.mp4').run();
-            }).catch(error => console.log(error));
+                    request.get(videoUrl + '/' + sliceFile)
+                        .pipe(fs.createWriteStream(fileSaveName)).on('finish', _ => {
+                            console.log('download of ' + fileSaveName + ' finished')
+                            resolve();
+                        });
+                }));
+            }
+            Promise.all(downloads)
+                .then(_ => {
+                    console.log(`Video ${videoId} for clips ${startTime} => ${endTime} download done !`);
+                    concatFiles(sliceFiles, bundleTsName);
+                    ffmeg().addInput(bundleTsName).output(`${videoId}_${startTime}_${endTime}.mp4`).run();
+                }).catch(error => console.log(error));
         });
     });
 };
@@ -68,15 +83,15 @@ function getRangeToDownload(start, end) {
     var range = [];
     var startBound = Math.trunc(start / 10);
     var endBound = Math.trunc(end / 10);
-    for(var i = startBound; i < endBound + 1; i ++) {
+    for (var i = startBound; i < endBound + 1; i++) {
         range.push(i + 1);
     }
     return range;
 }
 
 async function concatFiles(files, output) {
-    for(var file of files) {
-        var w = fs.createWriteStream(output, {flags: 'a'});
+    for (var file of files) {
+        var w = fs.createWriteStream(output, { flags: 'a' });
         await concatFile(file, w);
     }
 }

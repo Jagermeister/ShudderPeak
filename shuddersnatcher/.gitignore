@@ -41,6 +41,8 @@ testem.log
 *emoticon_images*.json
 /images
 *.ts
+*.mp4
+*.json
 
 # System Files
 .DS_Store
