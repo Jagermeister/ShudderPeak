@@ -47,7 +47,8 @@ function download(videoId, startTime, endTime) {
         Promise.all(downloads)
             .then(_ => {
                 console.log('all download done !');
-                process.execSync('cat ' + sliceFiles.join(' ') + ' > ' + bundleTsName);
+                concatFiles(sliceFiles, bundleTsName);
+                //process.execSync('cat ' + sliceFiles.join(' ') + ' > ' + bundleTsName);
                 ffmeg().addInput(bundleTsName).output('bundle.mp4').run();
             }).catch(error => console.log(error));
         });
@@ -71,4 +72,17 @@ function getRangeToDownload(start, end) {
         range.push(i + 1);
     }
     return range;
+}
+
+async function concatFiles(files, output) {
+    for(var file of files) {
+        var w = fs.createWriteStream(output, {flags: 'a'});
+        await concatFile(file, w);
+    }
+}
+async function concatFile(file, outputStream) {
+    return new Promise(resolve => {
+        fs.createReadStream(file).pipe(outputStream);
+        outputStream.on('finish', resolve);
+    })
 }
