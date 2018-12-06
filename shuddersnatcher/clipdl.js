@@ -1,7 +1,8 @@
-const request = require('request');
+const child_process = require('child_process');
 const fs = require('fs');
+const request = require('request');
+
 const config = require('./config.json');
-const ffmeg = require('fluent-ffmpeg');
 
 const options = (() => {
     const arguments = process.argv.slice(2);
@@ -14,88 +15,100 @@ const options = (() => {
 })();
 
 const videoId = options.video;
-const partDownloadDelay = 20000;
 
 new Promise((resolve, reject) =>
     fs.readFile('./highlight_' + videoId + '.json', (err, data) =>
         err ? reject(err) : resolve(JSON.parse(data).highlights)
-)).then(async highlights => {
-    for(var h of highlights) {
-        try {
-            await download(videoId, h.start, h.end);
-        } catch(err) {
-            console.log(`error -> ${err}`)
+    )).then(async highlights => {
+        console.log(`0. Requesting ${highlights.length} highlights from video ${videoId}`);
+        for (var h of highlights) {
+            try {
+                await download(videoId, h.start, h.end);
+            } catch (err) {
+                console.log(`error -> ${err}`)
+            }
         }
-    }
-});
+    });
 
 function download(videoId, startTime, endTime) {
     return new Promise((resolve, reject) => {
-    var tokenUrl = config.tokenUrlTemplate
-        .replace('{video_id}', videoId)
-        .replace('{client_id}', config.clientId);
-    request(tokenUrl, { json: true }, (err, _, body) => {
-        if (err) {
-            return console.log(err);
-        }
-        var sig = body.sig;
-        var videoUrl = config.tokenUrlVideoTemplate
+        var tokenUrl = config.tokenUrlTemplate
             .replace('{video_id}', videoId)
-            .replace('{sig}', sig)
-            .replace('{vod_token}', body.token);
-        videoUrl = encodeURI(videoUrl);
-
-        request(videoUrl, { json: true, rejectUnauthorized: false }, (err, _, body) => {
+            .replace('{client_id}', config.clientId);
+        request(tokenUrl, { json: true }, (err, _, body) => {
             if (err) {
                 return console.log(err);
             }
-            var videoUrl = getVideoEndpoint(body);
-            var videoSlices = getRangeToDownload(startTime, endTime);
-            var sliceFiles = [];
-            var downloads = [];
-            var bundleTsName = `${videoId}_${startTime}_${endTime}.ts`;
-            fs.createWriteStream(bundleTsName);
-            for (var slice of videoSlices) {
-                var sliceFile = slice + '.ts',
-                fileSaveName = `${videoId}_${sliceFile}`
-                sliceFiles.push(fileSaveName);
-                downloads.push(new Promise(resolve => {
-                    var file = fileSaveName;
-                    request.get(videoUrl + '/' + sliceFile)
-                        .pipe(fs.createWriteStream(file)).on('finish', _ => {
-                            console.log('download of ' + file + ' finished')
-                            resolve();
-                        });
-                }));
-            }
-            Promise.all(downloads)
-                .then(async _ => {
-                    console.log(`Video ${videoId} for clips ${startTime} => ${endTime} download done !`);
-                    await concatFiles(sliceFiles, bundleTsName);
-                   sliceFiles.forEach(s => fs.unlinkSync(s));
-                    await convertToMp4(videoId, startTime, endTime, bundleTsName);
-                    fs.unlinkSync(bundleTsName);
-                    resolve();
-                }).catch(error => { 
-                    console.log(error); 
-                    fs.unlinkSync(bundleTsName);
-                    reject();
-                });
+            var sig = body.sig;
+            var videoUrl = config.tokenUrlVideoTemplate
+                .replace('{video_id}', videoId)
+                .replace('{sig}', sig)
+                .replace('{vod_token}', body.token);
+            videoUrl = encodeURI(videoUrl);
+
+            request(videoUrl, { json: true, rejectUnauthorized: false }, (err, _, body) => {
+                if (err) {
+                    return console.log(err);
+                }
+                var videoUrl = getVideoEndpoint(body);
+                var videoSlices = getRangeToDownload(startTime, endTime);
+                var sliceFiles = [];
+                var downloads = [];
+                var bundleTsName = `${videoId}_${startTime}_${endTime}.ts`;
+                console.log(`1. Downloading ${videoId}, ${startTime}:${endTime}`);
+                console.time(`1. Downloading ${videoId}, ${startTime}:${endTime} completed`);
+                fs.createWriteStream(bundleTsName);
+                for (var slice of videoSlices) {
+                    var sliceFile = slice + '.ts',
+                        fileSaveName = `${videoId}_${sliceFile}`
+                    sliceFiles.push(fileSaveName);
+                    downloads.push(new Promise(resolve => {
+                        var file = fileSaveName;
+                        request.get(videoUrl + '/' + sliceFile)
+                            .pipe(fs.createWriteStream(file)).on('finish', _ => {
+                                console.log('     downloading ' + file + ' completed')
+                                resolve();
+                            });
+                    }));
+                }
+
+                Promise.all(downloads)
+                    .then(async _ => {
+                        console.timeEnd(`1. Downloading ${videoId}, ${startTime}:${endTime} completed`);
+                        console.log(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts`);
+                        console.time(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`)
+                        await concatFiles(sliceFiles, bundleTsName);
+                        sliceFiles.forEach(s => fs.unlinkSync(s));
+                        console.timeEnd(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`)
+                        console.log(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4`);
+                        console.time(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`)
+                        await convertToMp4(videoId, startTime, endTime, bundleTsName);
+                        fs.unlinkSync(bundleTsName);
+                        console.timeEnd(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`)
+                        resolve();
+                    }).catch(error => {
+                        console.log(error);
+                        fs.unlinkSync(bundleTsName);
+                        reject();
+                    });
+            });
         });
     });
-});
 };
 
 function convertToMp4(videoId, startTime, endTime, inputFile) {
     return new Promise((resolve, reject) => {
-        var converter = ffmeg();
-        converter.on('error', (err) => {
-            console.log('error in convertion to mp4');
-            reject(err);
-        })
-        converter.on('end', () => resolve());
-        converter.addInput(inputFile)
-        .output(`${videoId}_${startTime}_${endTime}.mp4`).run()
+        child_process.execSync(`ffmpeg -hide_banner -loglevel panic -i ${videoId}_${startTime}_${endTime}.ts -acodec copy -vcodec copy -y ${videoId}_${startTime}_${endTime}.mp4`);
+        /* ffmpeg: handling video, audio, and other multimedia files and streams
+         *  -hide_banner    Suppress printing banner
+         *  -loglevel panic Only show fatal errors
+         *  -i              Input File
+         *  -acodec         Set the audio codec
+         *  -vcodec         Set the video codec
+         *  -y              Overwrite output files without asking
+         *                  Output file
+        */
+        resolve();
     });
 }
 
