@@ -19,11 +19,18 @@ const partDownloadDelay = 20000;
 new Promise((resolve, reject) =>
     fs.readFile('./highlight_' + videoId + '.json', (err, data) =>
         err ? reject(err) : resolve(JSON.parse(data).highlights)
-)).then((highlights =>
-    highlights.forEach((h, i) =>
-        setTimeout(() => download(videoId, h.start, h.end), i * partDownloadDelay))));
+)).then(async highlights => {
+    for(var h of highlights) {
+        try {
+            await download(videoId, h.start, h.end);
+        } catch(err) {
+            console.log(`error -> ${err}`)
+        }
+    }
+});
 
 function download(videoId, startTime, endTime) {
+    return new Promise((resolve, reject) => {
     var tokenUrl = config.tokenUrlTemplate
         .replace('{video_id}', videoId)
         .replace('{client_id}', config.clientId);
@@ -50,25 +57,46 @@ function download(videoId, startTime, endTime) {
             fs.createWriteStream(bundleTsName);
             for (var slice of videoSlices) {
                 var sliceFile = slice + '.ts',
-                    fileSaveName = `${videoId}_${sliceFile}`
+                fileSaveName = `${videoId}_${sliceFile}`
                 sliceFiles.push(fileSaveName);
                 downloads.push(new Promise(resolve => {
+                    var file = fileSaveName;
                     request.get(videoUrl + '/' + sliceFile)
-                        .pipe(fs.createWriteStream(fileSaveName)).on('finish', _ => {
-                            console.log('download of ' + fileSaveName + ' finished')
+                        .pipe(fs.createWriteStream(file)).on('finish', _ => {
+                            console.log('download of ' + file + ' finished')
                             resolve();
                         });
                 }));
             }
             Promise.all(downloads)
-                .then(_ => {
+                .then(async _ => {
                     console.log(`Video ${videoId} for clips ${startTime} => ${endTime} download done !`);
-                    concatFiles(sliceFiles, bundleTsName);
-                    ffmeg().addInput(bundleTsName).output(`${videoId}_${startTime}_${endTime}.mp4`).run();
-                }).catch(error => console.log(error));
+                    await concatFiles(sliceFiles, bundleTsName);
+                   sliceFiles.forEach(s => fs.unlinkSync(s));
+                    await convertToMp4(videoId, startTime, endTime, bundleTsName);
+                    fs.unlinkSync(bundleTsName);
+                    resolve();
+                }).catch(error => { 
+                    console.log(error); 
+                    reject();
+                });
         });
     });
+});
 };
+
+function convertToMp4(videoId, startTime, endTime, inputFile) {
+    return new Promise((resolve, reject) => {
+        var converter = ffmeg();
+        converter.on('error', (err) => {
+            console.log('error in convertion to mp4');
+            reject(err);
+        })
+        converter.on('end', () => resolve());
+        converter.addInput(inputFile)
+        .output(`${videoId}_${startTime}_${endTime}.mp4`).run()
+    });
+}
 
 function getVideoEndpoint(body) {
     var lines = body.split('\n');
