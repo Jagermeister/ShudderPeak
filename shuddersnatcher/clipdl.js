@@ -78,6 +78,7 @@ function download(videoId, startTime, endTime) {
                     resolve();
                 }).catch(error => { 
                     console.log(error); 
+                    fs.unlinkSync(bundleTsName);
                     reject();
                 });
         });
