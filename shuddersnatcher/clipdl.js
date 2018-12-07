@@ -57,7 +57,6 @@ function download(videoId, startTime, endTime) {
                 var bundleTsName = `${videoId}_${startTime}_${endTime}.ts`;
                 console.log(`1. Downloading ${videoId}, ${startTime}:${endTime}`);
                 console.time(`1. Downloading ${videoId}, ${startTime}:${endTime} completed`);
-                fs.createWriteStream(bundleTsName);
                 for (var slice of videoSlices) {
                     var sliceFile = slice + '.ts',
                         fileSaveName = `${videoId}_${sliceFile}`
@@ -66,7 +65,7 @@ function download(videoId, startTime, endTime) {
                         var file = fileSaveName;
                         request.get(videoUrl + '/' + sliceFile)
                             .pipe(fs.createWriteStream(file)).on('finish', _ => {
-                                console.log('     downloading ' + file + ' completed')
+                                console.log('\tdownloading ' + file + ' completed')
                                 resolve();
                             });
                     }));
@@ -81,10 +80,10 @@ function download(videoId, startTime, endTime) {
                         sliceFiles.forEach(s => fs.unlinkSync(s));
                         console.timeEnd(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`)
                         console.log(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4`);
-                        console.time(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`)
-                        await convertToMp4(videoId, startTime, endTime, bundleTsName);
+                        console.time(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
+                        convertToMp4(videoId, startTime, endTime);
+                        console.timeEnd(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
                         fs.unlinkSync(bundleTsName);
-                        console.timeEnd(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`)
                         resolve();
                     }).catch(error => {
                         console.log(error);
@@ -96,20 +95,21 @@ function download(videoId, startTime, endTime) {
     });
 };
 
-function convertToMp4(videoId, startTime, endTime, inputFile) {
-    return new Promise((resolve, reject) => {
-        child_process.execSync(`ffmpeg -hide_banner -loglevel panic -i ${videoId}_${startTime}_${endTime}.ts -acodec copy -vcodec copy -y ${videoId}_${startTime}_${endTime}.mp4`);
-        /* ffmpeg: handling video, audio, and other multimedia files and streams
-         *  -hide_banner    Suppress printing banner
-         *  -loglevel panic Only show fatal errors
-         *  -i              Input File
-         *  -acodec         Set the audio codec
-         *  -vcodec         Set the video codec
-         *  -y              Overwrite output files without asking
-         *                  Output file
-        */
-        resolve();
-    });
+function convertToMp4(videoId, startTime, endTime) {
+    var inputFilename = `${videoId}_${startTime}_${endTime}.ts`;
+    var outputFilename = `${videoId}_${startTime}_${endTime}.mp4`;
+    try {
+        child_process.execSync(`ffmpeg -hide_banner -loglevel fatal -i ${inputFilename} -acodec copy -vcodec copy -y ${outputFilename}`);
+    } catch(e) {
+        if(fs.existsSync(__dirname + '/' + inputFilename)) {
+           fs.renameSync(__dirname + '/' + inputFilename, __dirname + '/error/' + inputFilename);
+        }
+        if(fs.existsSync(__dirname + '/' + outputFilename)) {
+            fs.renameSync(__dirname + '/' + outputFilename, __dirname + '/error/' + outputFilename);
+        }
+        console.log('/!\\ Error on ffmpeg .ts to .mp4, move file to the error folder');
+        console.log(e);
+     }
 }
 
 function getVideoEndpoint(body) {
@@ -131,11 +131,14 @@ function getRangeToDownload(start, end) {
     return range;
 }
 
-async function concatFiles(files, output) {
-    for (var file of files) {
-        var w = fs.createWriteStream(output, { flags: 'a' });
-        await concatFile(file, w);
-    }
+function concatFiles(files, output) {
+    return new Promise(async (resolve, reject) => {
+        for (var file of files) {
+            var w = fs.createWriteStream(output, { flags: 'a' });
+            await concatFile(file, w);
+        }
+        resolve();
+    });
 }
 async function concatFile(file, outputStream) {
     return new Promise(resolve => {
