@@ -17,79 +17,91 @@ const options = (() => {
 const videoId = options.video;
 
 new Promise((resolve, reject) =>
-    fs.readFile('./highlight_' + videoId + '.json', (err, data) =>
-        err ? reject(err) : resolve(JSON.parse(data).highlights)
-    )).then(async highlights => {
-        console.log(`0. Requesting ${highlights.length} highlights from video ${videoId}`);
+fs.readFile('./highlight_' + videoId + '.json', (err, data) =>
+err ? reject(err) : resolve(JSON.parse(data).highlights)
+)).then(highlights => {
+    console.log(`0. Requesting ${highlights.length} highlights from video ${videoId}`);
+    getSliceDownloadUrl(videoId).then(videoUrl => {
+        var i = 0;
         for (var h of highlights) {
             try {
-                await download(videoId, h.start, h.end);
+                download(videoUrl, videoId, h.start, h.end, i++);
             } catch (err) {
                 console.log(`error -> ${err}`)
             }
         }
-    });
+    })
+});
 
-function download(videoId, startTime, endTime) {
+function getSliceDownloadUrl(videoId) {
     return new Promise((resolve, reject) => {
         var tokenUrl = config.tokenUrlTemplate
-            .replace('{video_id}', videoId)
-            .replace('{client_id}', config.clientId);
+        .replace('{video_id}', videoId)
+        .replace('{client_id}', config.clientId);
         request(tokenUrl, { json: true }, (err, _, body) => {
             if (err) {
-                return console.log(err);
+                reject(err);
             }
             var sig = body.sig;
             var videoUrl = config.tokenUrlVideoTemplate
-                .replace('{video_id}', videoId)
-                .replace('{sig}', sig)
-                .replace('{vod_token}', body.token);
-            videoUrl = encodeURI(videoUrl);
+            .replace('{video_id}', videoId)
+            .replace('{sig}', sig)
+            .replace('{vod_token}', body.token);
+            resolve(encodeURI(videoUrl));
+        });
+    });
+}
 
-            request(videoUrl, { json: true, rejectUnauthorized: false }, (err, _, body) => {
-                if (err) {
-                    return console.log(err);
-                }
-                var videoUrl = getVideoEndpoint(body);
-                var videoSlices = getRangeToDownload(startTime, endTime);
-                var sliceFiles = [];
-                var downloads = [];
-                var bundleTsName = `${videoId}_${startTime}_${endTime}.ts`;
-                console.log(`1. Downloading ${videoId}, ${startTime}:${endTime}`);
-                console.time(`1. Downloading ${videoId}, ${startTime}:${endTime} completed`);
+function download(videoUrl, videoId, startTime, endTime, hIndex) {
+    return new Promise((resolve, reject) => {
+        request(videoUrl, { json: true, rejectUnauthorized: false }, (err, _, body) => {
+            if (err) {
+                return console.log(err);
+            }
+            var videoUrl = getVideoEndpoint(body);
+            var videoSlices = getRangeToDownload(startTime, endTime);
+            
+            var downloadSlices = new Promise((resolve, reject) => {
+                var sliceDls = [];
+                if (!fs.existsSync(__dirname + '/' + hIndex)){
+                    fs.mkdirSync(__dirname + '/' + hIndex);
+                };
                 for (var slice of videoSlices) {
-                    var sliceFile = slice + '.ts',
-                        fileSaveName = `${videoId}_${sliceFile}`
-                    sliceFiles.push(fileSaveName);
-                    downloads.push(new Promise(resolve => {
-                        var file = fileSaveName;
+                    console.log(`1. Downloading ${videoId}, ${startTime}:${endTime}`);
+                    sliceDls.push(new Promise((res, rej) => {
+                        var sliceFile = slice + '.ts',
+                        fileSaveName = `${hIndex}/${videoId}_${sliceFile}`;
                         request.get(videoUrl + '/' + sliceFile)
-                            .pipe(fs.createWriteStream(file)).on('finish', _ => {
-                                console.log('\tdownloading ' + file + ' completed')
-                                resolve();
-                            });
+                        .pipe(fs.createWriteStream(fileSaveName)).on('finish', _ => {
+                            console.log('\tdownloading ' + fileSaveName + ' completed')
+                            res(fileSaveName);
+                        }).on('error', _ => {
+                            console.log('\tdowloading ' + fileSaveName + ' failed')
+                            rej(fileSaveName);
+                        });
                     }));
                 }
-
-                Promise.all(downloads)
-                    .then(async _ => {
-                        console.timeEnd(`1. Downloading ${videoId}, ${startTime}:${endTime} completed`);
-                        console.log(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts`);
-                        console.time(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`)
-                        await concatFiles(sliceFiles, bundleTsName);
-                        sliceFiles.forEach(s => fs.unlinkSync(s));
-                        console.timeEnd(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`)
-                        console.log(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4`);
-                        console.time(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
-                        convertToMp4(videoId, startTime, endTime);
-                        console.timeEnd(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
-                        fs.unlinkSync(bundleTsName);
-                        resolve();
-                    }).catch(error => {
-                        console.log(error);
-                        fs.unlinkSync(bundleTsName);
-                        reject();
-                    });
+                Promise.all(sliceDls).then(files => resolve(files)).catch(_ => reject());
+            });
+            downloadSlices.then(async files => {
+                console.log(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts`);
+                console.time(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`);
+                var bundleTsName = `${videoId}_${startTime}_${endTime}.ts`;
+                await concatFiles(files, bundleTsName);
+                files.forEach(s => fs.unlinkSync(s));
+                console.timeEnd(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`)
+                console.log(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4`);
+                console.time(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
+                try {
+                    convertToMp4(videoId, startTime, endTime);
+                    console.timeEnd(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
+                    fs.unlinkSync(bundleTsName);
+                } catch(e) {
+                    console.log(e);
+                }
+                resolve();
+            }).catch(error => {
+                console.log('/!\\ Error on download for the file: ' + error);
             });
         });
     });
@@ -99,17 +111,17 @@ function convertToMp4(videoId, startTime, endTime) {
     var inputFilename = `${videoId}_${startTime}_${endTime}.ts`;
     var outputFilename = `${videoId}_${startTime}_${endTime}.mp4`;
     try {
-        child_process.execSync(`ffmpeg -hide_banner -loglevel fatal -i ${inputFilename} -acodec copy -vcodec copy -y ${outputFilename}`);
+        child_process.execSync(`ffmpeg -hide_banner -loglevel quiet -i ${inputFilename} -acodec copy -vcodec copy -y ${outputFilename}`);
     } catch(e) {
         if(fs.existsSync(__dirname + '/' + inputFilename)) {
-           fs.renameSync(__dirname + '/' + inputFilename, __dirname + '/error/' + inputFilename);
+            fs.renameSync(__dirname + '/' + inputFilename, __dirname + '/error/' + inputFilename);
         }
         if(fs.existsSync(__dirname + '/' + outputFilename)) {
             fs.renameSync(__dirname + '/' + outputFilename, __dirname + '/error/' + outputFilename);
         }
         console.log('/!\\ Error on ffmpeg .ts to .mp4, move file to the error folder');
-        console.log(e);
-     }
+        throw new Error(e);
+    }
 }
 
 function getVideoEndpoint(body) {
