@@ -20,6 +20,7 @@ class Server {
             const channels = Object.keys(this.channelsByName);
             for (let i = 0, l = channels.length; i < l; i++) {
                 const channel = this.channelsByName[channels[i]];
+                channel.report();
                 channel.writeFile();
             }
         }, 60000);

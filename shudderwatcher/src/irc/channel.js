@@ -7,16 +7,6 @@ class Channel {
         this.stream = stream;
         this.joined_time = new Date().getTime();
         this.stats = new MessageStatistics();
-        //TODO: Download channel emote set
-
-        let statRef = this.stats;
-        let report = () => {
-            if (this.stats.data.length) {
-                statRef.reportHighLevel(channelName);
-            }
-            this.reportTimeoutId = setTimeout(report, 30000)
-        }
-        report();
     }
 
     onMessage(message) {
@@ -25,7 +15,11 @@ class Channel {
 
     onPart() {
         console.log(`Leaving ${this.channelName}.. final report`);
-        this.stats.report();
+        this.report();
+    }
+
+    report() {
+        this.stats.reportHighLevel(this.channelName);
     }
 
     filename() {
