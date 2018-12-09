@@ -1,3 +1,5 @@
+const chalk = require('chalk');
+
 class MessageStatistics {
     constructor() {
         this.bucket_duration_ms = 30000;
@@ -47,8 +49,9 @@ class MessageStatistics {
         const emoteMultiplier = this.emotesUnique.size ? this.emote_count / this.emotesUnique.size : null;
         const emoteMultiplierDisplay = emoteMultiplier ? emoteMultiplier.toFixed(1) + 'x' : '';
 
-        console.log(`  ${name.slice(0, 12)}\t${dateOldest.slice(0, 10)}\t${duration.toFixed(1)} Mins
-    M:${('00000'+this.message_count).slice(-5)} (U:${this.usersUnique.size}) [${msgToUserDisplay}]\tE:${this.emote_count} (${this.emotesUnique.size}) [${emoteMultiplierDisplay}]`);
+        const reportPrefix = chalk.bgBlueBright('  ');
+        console.log(`${reportPrefix}${name.slice(0, 12)}\t${dateOldest.slice(0, 10)}\t${duration.toFixed(1)} Mins
+${reportPrefix}  M:${('00000'+this.message_count).slice(-5)} (U:${this.usersUnique.size}) [${msgToUserDisplay}]\tE:${this.emote_count} (${this.emotesUnique.size}) [${emoteMultiplierDisplay}]`);
     }
 }
 

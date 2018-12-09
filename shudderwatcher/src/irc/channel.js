@@ -13,12 +13,7 @@ class Channel {
         this.stats.observe(message);
     }
 
-    onPart() {
-        console.log(`Leaving ${this.channelName}.. final report`);
-        this.report();
-    }
-
-    report() {
+    statusReport() {
         this.stats.reportHighLevel(this.channelName);
     }
 
@@ -26,9 +21,9 @@ class Channel {
         return `${this.channelName}_${this.joined_time}_${this.stream.created}_${this.stream.game}.json`;
     }
 
-    writeFile() {
+    writeFile(rootFilePath='./') {
         return new Promise((resolve, reject) => fs.writeFile(
-            this.filename(),
+            rootFilePath + this.filename(),
             JSON.stringify({
                 'stream': {
                     '_id': this.stream._id,

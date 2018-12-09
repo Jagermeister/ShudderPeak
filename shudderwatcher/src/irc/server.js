@@ -1,4 +1,5 @@
 const WebSocket = require('ws');
+const chalk = require('chalk');
 const config = require('../config.json');
 const Channel = require('./channel.js');
 
@@ -18,10 +19,11 @@ class Server {
 
         setInterval(() => {
             const channels = Object.keys(this.channelsByName);
+            if (channels.length) console.log(chalk.bgBlueBright.white('  Server Channel Status'));
             for (let i = 0, l = channels.length; i < l; i++) {
                 const channel = this.channelsByName[channels[i]];
-                channel.report();
-                channel.writeFile();
+                channel.statusReport();
+                channel.writeFile('../data/stream/');
             }
         }, 60000);
     }
@@ -78,8 +80,8 @@ class Server {
                 //:<host> CAP * ACK :./tags ./commands ./membership\r\n'
             } else if (parsed.command === "PART") {
                 const channelName = parsed.channel;
-                this.channelsByName[channelName].onPart();
                 delete this.channelsByName[channelName];
+                console.log('>  IRC', `PART channel '${channelName}'`);
             } else if (parsed.command === "JOIN") {
                 const channelName = parsed.channel;
                 const stream = this.streamByChannelName[channelName];
@@ -119,7 +121,7 @@ class Server {
         };
 
         if (rawMessage.startsWith("PING")) {
-            return { command: "PING", message: rawMessage.split(':')[1] };
+            return { command: "PING", message: rawMessage.split(':')[1].replace(/\r\n/g, '') };
         }
 
         const tagID = '@',
@@ -171,7 +173,7 @@ class Server {
     send(message) {
         const socket = this.webSocket;
         if (socket !== null && socket.readyState === 1) {
-            console.log('<IRC', message.command, message.command == "Set Password" ? 'PASS oauth:********' : message.message);
+            console.log('<  IRC', message.command, message.command == "Set Password" ? 'PASS oauth:********' : message.message);
             socket.send(message.message);
         } else {
             console.log('!!!', 'Socket not ready - Unable to send message: ', message);

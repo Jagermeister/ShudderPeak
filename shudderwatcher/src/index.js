@@ -88,7 +88,7 @@ function removeDeadChannels() {
                     const channel = ircServer.channelsByName[c];
                     const filename = channel.filename();
                     ircServer.part(c)
-                        .then(() => fs.rename(filename, `./highlight/${filename}`));
+                        .then(() => fs.rename(filename, `../data/highlight/${filename}`));
                 }
             });
         });
