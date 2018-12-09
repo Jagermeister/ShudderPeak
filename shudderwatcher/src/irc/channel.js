@@ -27,13 +27,23 @@ class Channel {
     }
 
     writeFile() {
-        return new Promise((resolve, reject) => {
-            fs.writeFile(
-                this.filename(),
-                JSON.stringify(this.stats.data),
-                err => err ? reject(err) : resolve()
-            )
-        });
+        return new Promise((resolve, reject) => fs.writeFile(
+            this.filename(),
+            JSON.stringify({
+                'stream': {
+                    '_id': this.stream._id,
+                    'game': this.stream.game
+                },
+                'channel': {
+                    '_id': this.stream.channel._id,
+                    'name': this.stream.channel.name,
+                    'display_name': this.stream.channel.display_name
+                },
+                'video': this.stream.video,
+                'stats': this.stats.data
+            }),
+            err => err ? reject(err) : resolve()
+        ));
     }
 }
 

@@ -1,0 +1,8 @@
+{
+    "esversion": 6,
+    "node": true,
+    "forin": true,
+    "unused": true,
+    "undef": true,
+    "varstmt": true
+}
