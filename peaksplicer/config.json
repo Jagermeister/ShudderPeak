@@ -1,0 +1,5 @@
+{
+  "tokenUrlTemplate": "https://api.twitch.tv/api/vods/{video_id}/access_token?client_id={client_id}",
+  "vodUrlTemplate": "https://usher.twitch.tv/vod/{video_id}?nauthsig={sig}&nauth={vod_auth}&allow_source=true&player=twitchweb&allow_spectre=true&allow_audio_only=true",
+  "clientId": "kknrnehj5rmup7lvivx0c7a9psruna"
+}
