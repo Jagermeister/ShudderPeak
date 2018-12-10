@@ -1,16 +1,6 @@
 const chalk = require('chalk');
 const api = require('./api.js');
 
-const options = (() => {
-    const arguments = process.argv.slice(2);
-    const parameters = {};
-    arguments.forEach(a => {
-        const keyValue = a.split('=');
-        parameters[keyValue[0]] = keyValue.length > 1 ? keyValue[1] : true;
-    })
-    return parameters;
-})();
-
 api.channelsByViewers().then(streams => {
     const bgColors = [
         chalk.bgBlack.white.bold,
@@ -50,11 +40,11 @@ api.channelsByViewers().then(streams => {
         statsByGame[s.game] = statsByGame[s.game] || { viewers: 0, streamers: 0 };
         statsByGame[s.game].viewers += s.viewers;
         statsByGame[s.game].streamers++;
-        console.log(('000000'+s.viewers).slice(-6), `[${gameStyle(s.game)}]`, ' '.repeat(maxGameCharacters - s.game.length), `${s.channel.name} (${s.channel._id})`)
+        console.log(('000000'+s.viewers).slice(-6), `[${gameStyle(s.game)}]`, ' '.repeat(maxGameCharacters - s.game.length), `${s.channel.name} (${s.channel._id})`);
     });
     const streamCount = streams.length;
     const viewerSum = streams.map(s => s.viewers).reduce((p, c) => p + c, 0);
-    console.log('------', '------')
+    console.log('------', '------');
     console.log(('000000'+viewerSum).slice(-6), `${streamCount} streamers`);
     console.log();
     console.log(bold('Viewer'), bold('Streamer'), bold(`[${gameTitle}]`));

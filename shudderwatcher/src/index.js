@@ -1,5 +1,4 @@
 const fs = require('fs');
-const chalk = require('chalk');
 
 const authenticate = require('./OAuth2.js');
 const api = require('./api.js');
@@ -32,7 +31,13 @@ authenticate(SCOPES).then((token) => {
             .then(() => new Promise((resolve, reject) => {
                 const channels = Object.keys(ircServer.channelsByName);
                 const newChannels = channelCountMax - channels.length;
-                resolve(newChannels > 0 ? channelsFetch(newChannels) : []);
+                if (newChannels > 0) {
+                    const fetchedChannels = channelsFetch(newChannels)
+                        .catch(reason => reject(reason));
+                    resolve(fetchedChannels);
+                } else {
+                    resolve([]);
+                }
             }))
             .then((streams) => streams.forEach((stream, i) => setTimeout(() => {
                 const channelName = stream.channel.name;

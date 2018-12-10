@@ -69,11 +69,13 @@ function _bucketObserveMessage(bucket, message, imageKeys) {
     bucket.users.add(message.user);
     bucket.emoteCount += Object.keys(message.emotes).reduce((p, c) => p + message.emotes[c], 0);
     for (let key in message.emotes) {
-        imageKeys.add(key);
-        bucket.emotes[key] = bucket.emotes[key] || 0;
-        bucket.emotes[key] += message.emotes[key];
-        bucket.emotesNoSpam[key] = bucket.emotesNoSpam[key] || 0;
-        bucket.emotesNoSpam[key]++;
+        if (message.emotes.hasOwnProperty(key)) {
+            imageKeys.add(key);
+            bucket.emotes[key] = bucket.emotes[key] || 0;
+            bucket.emotes[key] += message.emotes[key];
+            bucket.emotesNoSpam[key] = bucket.emotesNoSpam[key] || 0;
+            bucket.emotesNoSpam[key]++;
+        }
     }
 }
 
@@ -93,12 +95,11 @@ function _seriesStatistics(values) {
 
     const stDev = Math.sqrt(
         values.map(v => (v - mean) * (v - mean))
-            .reduce(sum, 0)
-        / count
+            .reduce(sum, 0) / count
     );
 
     const vMin = Math.min(...values);
-    const vMax = Math.max(...values)
+    const vMax = Math.max(...values);
 
     return {
         mean: mean,
