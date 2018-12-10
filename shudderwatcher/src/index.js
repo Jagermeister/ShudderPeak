@@ -86,9 +86,12 @@ function removeDeadChannels() {
             serverChannels.forEach(c => {
                 if (!channelNames.includes(c)) {
                     const channel = ircServer.channelsByName[c];
-                    const filename = channel.filename();
+                    const filename = channel.filename(),
+                        filePath = '../data/stream/' + filename,
+                        movePath = '../data/highlight/' + filename;
                     ircServer.part(c)
-                        .then(() => fs.rename(filename, `../data/highlight/${filename}`));
+                        .then(() => fs.rename(filePath, movePath,
+                            err => err ? console.log(err) : `Successfully moved from '${filePath}' to '${movePath}'.`));
                 }
             });
         });
