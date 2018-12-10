@@ -33,4 +33,4 @@ credentials.then((token) => {
                 );
             }, 60000);
         });
-})
+});

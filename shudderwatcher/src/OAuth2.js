@@ -17,7 +17,7 @@ module.exports = (scopes) => {
             err ? reject(err) : resolve(JSON.parse(data));
         });
     }).then(data => fetchCredentials(data, scopes));
-}
+};
 
 /**
  * Create an OAuth2 client with the given credentials
@@ -33,14 +33,10 @@ function fetchCredentials(credentials, scopes) {
                 const t = JSON.parse(token);
                 const n = Date.now();
                 const e = 'Token Expired';
-                (t.created + t.expires_in * 1000 < n) ? reject(t) : resolve(t);
+                (t.created + t.expires_in * 1000 < n) ? reject([e, t]) : resolve(t);
             }
         });
-    }).catch((token) => {
-        return (token && token.refresh_token)
-            ? refreshToken(credentials, token)
-            : getNewToken(credentials, scopes);
-    });
+    }).catch((token) => (token && token.refresh_token) ? refreshToken(credentials, token) : getNewToken(credentials, scopes));
 }
 
 /**
@@ -58,13 +54,13 @@ function getNewToken(credentials, scopes=[]) {
         };
         const authUrl = `${config.auth.endpoint+action}?${dictToString(params)}`;
         console.log('Authorize this app by visiting:', authUrl);
-        var rl = readline.createInterface({
+        let rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout
         });
         rl.question('Enter the URL from that page here:', (code) => {
             rl.close();
-            resolve(processURL(code))
+            resolve(processURL(code));
         });
     }).then(code => {
         return new Promise((resolve, reject) => {
@@ -116,9 +112,7 @@ function refreshToken(credentials, token) {
                 resolve(refreshToken);
             }
         });
-    }).catch((credentials, token) => {
-        return getNewToken(credentials, token.scope)
-    });
+    }).catch((credentials, token) =>  getNewToken(credentials, token.scope));
 }
 
 /**

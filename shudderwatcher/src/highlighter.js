@@ -7,14 +7,12 @@ const options = (() => {
     arguments.forEach(a => {
         const keyValue = a.split('=');
         parameters[keyValue[0]] = keyValue.length > 1 ? keyValue[1] : true;
-    })
+    });
     return parameters;
 })();
 
 const videoId = options.video;
-new Promise((resolve, reject) => {
-    fs.readFile('./videos.json', (err, videos) => err ? reject(err) : resolve(JSON.parse(videos).videos));
-})
+new Promise((resolve, reject) => fs.readFile('./videos.json', (err, videos) => err ? reject(err) : resolve(JSON.parse(videos).videos)))
 .then(videos => videos.filter(v => v._id == 'v'+videoId)[0])
 .then(video => {
     const startTime = new Date(video.created_at).getTime();
@@ -24,7 +22,7 @@ new Promise((resolve, reject) => {
 .then(([startTime, endTime]) => {
     console.log('    Video', videoId);
     console.log('>>>', new Date(startTime).toISOString());
-    console.log('<<<', new Date(endTime).toISOString())
+    console.log('<<<', new Date(endTime).toISOString());
     new Promise((resolve, reject) => {
         fs.readFile('./highlight/' + videoId + '.json', (err, messages) => err ? reject(err) : resolve(JSON.parse(messages)));
     })
@@ -33,14 +31,14 @@ new Promise((resolve, reject) => {
         console.log();
         console.log('    Messages:', messages.length);
         console.log('>>>', new Date(messages[0].time).toISOString());
-        console.log('<<<', new Date(messages[messages.length-1].time).toISOString())
+        console.log('<<<', new Date(messages[messages.length-1].time).toISOString());
         const messageHighlights = new Highlights(messages);
         messageHighlights.bucketsCreate();
         messageHighlights.bucketsHighlight();
         return messageHighlights.bucketsHighlighted;
     })
     .then(buckets => {
-        console.log('Highlights:', buckets.length)
+        console.log('Highlights:', buckets.length);
         fs.writeFile('./highlight/highlight_' + videoId + '.json', JSON.stringify(
             {
                 videoId: videoId,
@@ -48,7 +46,7 @@ new Promise((resolve, reject) => {
                     return {
                         start: Math.floor((b.start - startTime) / 1000),
                         end: Math.floor((b.end - startTime) / 1000)
-                    }
+                    };
                 })
             }
         ), err => err ? console.log(err) : console.log('Highlight saved.'));
