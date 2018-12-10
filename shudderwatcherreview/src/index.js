@@ -76,7 +76,7 @@ export default ((Messages) => {
                 })
             );
             videoMetaData = video;
-            videoElement.setAttribute('src', './' + video.source);
+            videoElement.setAttribute('src', './' + video._id.slice(1) + '.json');
             fetch(video.messages)
                 .then(response => response.json())
                 .then(messages => {

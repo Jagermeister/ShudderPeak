@@ -1,4 +1,4 @@
-const bucketDurationMSDefault = 30000;
+const bucketDurationMSDefault = 40000;
 const bucketStatsLookbackMSDefault = 480000;
 
 class Messages {
@@ -44,7 +44,7 @@ class Messages {
         for (let i = 0, l = this.buckets.length; i < l; i++) {
             const b = _bucketsByLookback(this.buckets, i, bucketLookback);
             const s = _seriesStatistics(b.map(b => b.messages + b.emoteCount));
-            upperBound2StDev.push(s.mean + s.standard_deviation + s.standard_deviation);
+            upperBound2StDev.push(s.mean + s.standard_deviation + s.standard_deviation + s.standard_deviation);
         }
 
         this.bucketsHighlighted = this.buckets.map((b, i) => Object.assign(b, { index: i }))

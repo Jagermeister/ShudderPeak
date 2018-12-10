@@ -24,9 +24,9 @@ new Promise((resolve, reject) => fs.readFile('./videos.json', (err, videos) => e
     console.log('>>>', new Date(startTime).toISOString());
     console.log('<<<', new Date(endTime).toISOString());
     new Promise((resolve, reject) => {
-        fs.readFile('./highlight/' + videoId + '.json', (err, messages) => err ? reject(err) : resolve(JSON.parse(messages)));
+        fs.readFile('../data/highlight/' + videoId + '.json', (err, hightlight) => err ? reject(err) : resolve(JSON.parse(hightlight)));
     })
-    .then(messages => messages.filter(m => +m.time >= startTime && +m.time <= endTime))
+    .then(hightlight => hightlight.stats.filter(m => +m.time >= startTime && +m.time <= endTime))
     .then(messages => {
         console.log();
         console.log('    Messages:', messages.length);
@@ -39,7 +39,7 @@ new Promise((resolve, reject) => fs.readFile('./videos.json', (err, videos) => e
     })
     .then(buckets => {
         console.log('Highlights:', buckets.length);
-        fs.writeFile('./highlight/highlight_' + videoId + '.json', JSON.stringify(
+        fs.writeFile('../data/download/' + videoId + '.json', JSON.stringify(
             {
                 videoId: videoId,
                 highlights: buckets.map(b => {
