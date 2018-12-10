@@ -8,10 +8,8 @@ const viewerMinimumCount = filter.viewerMinimum ? filter.viewerMinimum : viewerM
 
 const api = {};
 api.channelsByViewers = function() {
-    return new Promise((resolve, reject) => {
-        fs.readFile('client_secret.json', (err, data) => err ? reject(err) : resolve(JSON.parse(data)));
-    }).then(token => new Promise((resolve, reject) => {
-        const endpoint = 'streams/'
+    return fetchToken().then(token => new Promise((resolve, reject) => {
+        const endpoint = 'streams/';
         const parameters = {
             'limit': '50',
             'language': 'en',
@@ -31,19 +29,17 @@ api.channelsByViewers = function() {
                 name: s.channel.name,
                 views: s.channel.views,
                 followers: s.channel.followers
-            }}
+            }};
         }).filter(s => s.viewers > viewerMinimumCount)
     ).then(streams => streams.filter(s =>
         !(filter.gamesDisallowed.includes(s.game) || filter.streamersDisallowed.includes(s.channel.name)))
     );
-}
+};
 
 api.channelsStatusByName = function (channelNames) {
-    return new Promise((resolve, reject) => {
-        fs.readFile('client_secret.json', (err, data) => err ? reject(err) : resolve(JSON.parse(data)));
-    }).then(token => new Promise((resolve, reject) => {
+    return fetchToken().then(token => new Promise((resolve, reject) => {
         if (channelNames.length > 0) {
-            const endpoint = 'streams/'
+            const endpoint = 'streams/';
             const parameters = {
                 'channel': channelNames.join(','),
                 'client_id': token.client_id
@@ -60,8 +56,37 @@ api.channelsStatusByName = function (channelNames) {
             channel: s.channel.name,
             viewers: s.viewers,
             created: s.created_at
-    }}));
+    };}));
 };
+
+api.channelLiveVideo = function(channelName) {
+    return fetchToken().then(token => new Promise((resolve, reject) => {
+        const endpoint = `channels/${channelName}/videos`;
+        const parameters = {
+            'limit': 1,
+            'broadcast_type': 'archive',
+            'client_id': token.client_id
+        };
+        request.get(
+            `${config.endpoint}${endpoint}?${dictToString(parameters)}`,
+            (err, _, body) => err ? reject(err) : resolve(JSON.parse(body).videos)
+        );
+    }))
+    .then(videos => new Promise((resolve, reject) => {
+        if (videos.length === 1) {
+            const video = videos[0];
+            if (video.status === 'recording') resolve(video);
+        }
+
+        reject();
+    }));
+};
+
+function fetchToken() {
+    return new Promise((resolve, reject) => {
+        fs.readFile('client_secret.json', (err, data) => err ? reject(err) : resolve(JSON.parse(data)));
+    });
+}
 
 function dictToString(dict) {
     return Object.keys(dict).map(k => `${k}=${dict[k]}`).join('&');

@@ -12,20 +12,20 @@ const SCOPES = [
 
 const credentials = authenticate(SCOPES);
 credentials.then((token) => {
-    const twitch = new IRCServer({
+    const server = new IRCServer({
         username: token.username,
         password: 'oauth:' + token.access_token,
     });
 
     const channelName = '#nl_kripp';
 
-    twitch.open()
+    server.open()
         .then(() => {
-            twitch.join(channelName);
+            server.join(channelName);
             setInterval(() => {
                 fs.writeFile(
-                    'nl_kripp_3.json',
-                    JSON.stringify(twitch.channelsByName[channelName].stats.data),
+                    `test_${channelName}.json`,
+                    JSON.stringify(server.channelsByName[channelName].stats.data),
                     (err) => {
                         if (err) throw err;
                         console.log('The file has been saved!');

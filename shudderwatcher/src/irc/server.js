@@ -1,4 +1,5 @@
 const WebSocket = require('ws');
+const chalk = require('chalk');
 const config = require('../config.json');
 const Channel = require('./channel.js');
 
@@ -18,9 +19,11 @@ class Server {
 
         setInterval(() => {
             const channels = Object.keys(this.channelsByName);
+            if (channels.length) console.log(chalk.bgBlueBright.white('  Server Channel Status'));
             for (let i = 0, l = channels.length; i < l; i++) {
                 const channel = this.channelsByName[channels[i]];
-                channel.writeFile();
+                channel.statusReport();
+                channel.writeFile('../data/stream/');
             }
         }, 60000);
     }
@@ -28,7 +31,7 @@ class Server {
     open() {
         this.webSocket = new WebSocket(`wss://${this.server}:${this.port}/`, 'irc');
         this.webSocket.onmessage = this.onMessage.bind(this);
-        this.webSocket.onerror = (msg) => console.log('Error:', msg);
+        this.webSocket.onerror = msg => console.log('Error:', msg);
         this.webSocket.onclose = () => {
             console.log('Disconnected');
             process.exit();
@@ -37,7 +40,7 @@ class Server {
         const server = this;
         return new Promise((resolve, reject) => {
             server.serverOnOpenResolve = resolve;
-        })
+        });
     }
 
     join(channelName, stream) {
@@ -60,7 +63,7 @@ class Server {
 
     onMessage(message) {
         if (message !== null) {
-            var parsed = this.parseMessage(message.data);
+            const parsed = this.parseMessage(message.data);
             if (parsed.command === "PRIVMSG") {
                 //> @badges=<badges>;color=<color>;display-name=<display-name>;emotes=<emotes>;id=<id-of-msg>;mod=<mod>;room-id=<room-id>;subscriber=<subscriber>;tmi-sent-ts=<timestamp>;turbo=<turbo>;user-id=<user-id>;user-type=<user-type> :<user>!<user>@<user>..... PRIVMSG #<channel> :<message>
                 if (parsed.channel in this.channelsByName) {
@@ -77,8 +80,8 @@ class Server {
                 //:<host> CAP * ACK :./tags ./commands ./membership\r\n'
             } else if (parsed.command === "PART") {
                 const channelName = parsed.channel;
-                this.channelsByName[channelName].onPart();
                 delete this.channelsByName[channelName];
+                console.log('>  IRC', `PART channel '${channelName}'`);
             } else if (parsed.command === "JOIN") {
                 const channelName = parsed.channel;
                 const stream = this.streamByChannelName[channelName];
@@ -109,7 +112,7 @@ class Server {
     }
 
     parseMessage(rawMessage) {
-        var parsedMessage = {
+        const parsedMessage = {
             message: null,
             tags: {},
             command: null,
@@ -118,7 +121,7 @@ class Server {
         };
 
         if (rawMessage.startsWith("PING")) {
-            return { command: "PING", message: rawMessage.split(':')[1] };
+            return { command: "PING", message: rawMessage.split(':')[1].replace(/\r\n/g, '') };
         }
 
         const tagID = '@',
@@ -155,7 +158,7 @@ class Server {
     }
 
     onOpen() {
-        var socket = this.webSocket;
+        const socket = this.webSocket;
         if (socket !== null && socket.readyState === 1) {
             if (config.irc.capability_negotiation.length) {
                 const cap_req = config.irc.capability_negotiation.join(' ');
@@ -168,9 +171,9 @@ class Server {
     }
 
     send(message) {
-        var socket = this.webSocket;
+        const socket = this.webSocket;
         if (socket !== null && socket.readyState === 1) {
-            console.log('<IRC', message.command, message.command == "Set Password" ? 'PASS oauth:********' : message.message);
+            console.log('<  IRC', message.command, message.command == "Set Password" ? 'PASS oauth:********' : message.message);
             socket.send(message.message);
         } else {
             console.log('!!!', 'Socket not ready - Unable to send message: ', message);
