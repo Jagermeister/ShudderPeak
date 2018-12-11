@@ -1,7 +1,8 @@
 const child_process = require('child_process');
 const fs = require('fs');
 const request = require('request');
-
+const path = require('path');
+const rimraf = require('rimraf');
 const config = require('./config.json');
 
 const options = (() => {
@@ -21,14 +22,20 @@ new Promise((resolve, reject) =>
 ).then(highlights => {
   console.log(`0. Requesting ${highlights.length} highlights from video ${videoId}`);
   getSliceDownloadUrl(videoId).then(videoUrl => {
-    var i = 0;
-    for (var h of highlights) {
-      try {
-        download(videoUrl, videoId, h.start, h.end, i++);
-      } catch (err) {
-        console.log(`error -> ${err}`);
+    request(videoUrl, { json: true, rejectUnauthorized: false }, (err, _, body) => {
+      if (err) {
+        return console.log(err);
       }
-    }
+      var videoUrl = getVideoEndpoint(body);
+      var i = 0;
+      for (var h of highlights) {
+        try {
+          download(videoUrl, videoId, h.start, h.end, i++);
+        } catch (err) {
+          console.log(`error -> ${err}`);
+        }
+      }
+    });
   });
 });
 
@@ -51,65 +58,64 @@ function getSliceDownloadUrl(videoId) {
 
 function download(videoUrl, videoId, startTime, endTime, hIndex) {
   return new Promise(resolve => {
-    request(videoUrl, { json: true, rejectUnauthorized: false }, (err, _, body) => {
-      if (err) {
-        return console.log(err);
-      }
-      var videoUrl = getVideoEndpoint(body);
-      var videoSlices = getRangeToDownload(startTime, endTime);
+    var videoSlices = getRangeToDownload(startTime, endTime);
 
-      var downloadSlices = new Promise((resolve, reject) => {
-        var sliceDls = [];
-        if (!fs.existsSync(__dirname + '/' + hIndex)) {
-          fs.mkdirSync(__dirname + '/' + hIndex);
-        }
-        for (var slice of videoSlices) {
-          console.log(`1. Downloading ${videoId}, ${startTime}:${endTime}`);
-          sliceDls.push(
-            new Promise((res, rej) => {
-              var sliceFile = slice + '.ts',
-                fileSaveName = `${hIndex}/${videoId}_${sliceFile}`;
-              request
-                .get(videoUrl + '/' + sliceFile)
-                .pipe(fs.createWriteStream(fileSaveName))
-                .on('finish', () => {
-                  console.log('\tdownloading ' + fileSaveName + ' completed');
-                  res(fileSaveName);
-                })
-                .on('error', () => {
-                  console.log('\tdowloading ' + fileSaveName + ' failed');
-                  rej(fileSaveName);
-                });
-            })
-          );
-        }
-        Promise.all(sliceDls)
-          .then(files => resolve(files))
-          .catch(() => reject());
-      });
-      downloadSlices
-        .then(async files => {
-          console.log(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts`);
-          console.time(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`);
-          var bundleTsName = `${videoId}_${startTime}_${endTime}.ts`;
-          await concatFiles(files, bundleTsName);
-          files.forEach(s => fs.unlinkSync(s));
-          console.timeEnd(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`);
-          console.log(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4`);
-          console.time(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
-          try {
-            convertToMp4(videoId, startTime, endTime);
-            console.timeEnd(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
-            fs.unlinkSync(bundleTsName);
-          } catch (e) {
-            console.log(e);
-          }
-          resolve();
-        })
-        .catch(error => {
-          console.log('/!\\ Error on download for the file: ' + error);
-        });
+    var downloadSlices = new Promise((resolve, reject) => {
+      var sliceDls = [];
+      for (var slice of videoSlices) {
+        console.log(`1. Downloading ${videoId}, ${startTime}:${endTime}`);
+        sliceDls.push(
+          new Promise((res, rej) => {
+            if (!fs.existsSync(__dirname + '/' + hIndex)) {
+              fs.mkdirSync(__dirname + '/' + hIndex);
+            }
+            var sliceFile = slice + '.ts',
+              fileSaveName = `${hIndex}/${videoId}_${sliceFile}`;
+            request
+              .get(videoUrl + '/' + sliceFile)
+              .pipe(fs.createWriteStream(fileSaveName))
+              .on('finish', () => {
+                console.log('\tdownloading ' + fileSaveName + ' completed');
+                res(fileSaveName);
+              })
+              .on('error', () => {
+                console.log('\tdowloading ' + fileSaveName + ' failed');
+                rej(fileSaveName);
+              });
+          })
+        );
+      }
+      Promise.all(sliceDls)
+        .then(files => resolve(files))
+        .catch(() => reject());
     });
+    downloadSlices
+      .then(async files => {
+        console.log(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts`);
+        console.time(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`);
+        var bundleTsName = `${videoId}_${startTime}_${endTime}.ts`;
+        await concatFiles(files, bundleTsName);
+        if (files && files.length > 0) {
+          rimraf.sync(path.dirname(files[0]));
+        }
+        console.timeEnd(`2. Bundling clips into ${videoId}_${startTime}_${endTime}.ts completed`);
+        console.log(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4`);
+        console.time(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
+        try {
+          convertToMp4(videoId, startTime, endTime);
+          console.timeEnd(`3. Converting ${videoId}_${startTime}_${endTime}.ts into ${videoId}_${startTime}_${endTime}.mp4 completed`);
+          fs.unlinkSync(bundleTsName);
+        } catch (e) {
+          console.log(e);
+        }
+        resolve();
+      })
+      .catch(error => {
+        console.log('/!\\ Error on download for the file: ' + error);
+        if (error && error.length > 0) {
+          rimraf.sync(path.dirname(error[0]));
+        }
+      });
   });
 }
 
