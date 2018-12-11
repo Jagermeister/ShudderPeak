@@ -40,6 +40,8 @@ testem.log
 *config.json
 *emoticon_images*.json
 *.json
+*.ts
+*.mp4
 */images
 
 # System Files

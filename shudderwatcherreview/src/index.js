@@ -3,8 +3,9 @@ export default ((Messages) => {
         const loadingPromises = [];
         const timelineHighlight = document.getElementById("timelineHighlight");
         const videoElement = document.querySelector("video");
+        let hasVideo = false;
 
-        const canvas_width = 1080,
+        const canvas_width = 1800,
             canvas_height = 450;
         const canvas = utility.canvasCreate("canvasContainer", "hexBackground", { width: canvas_width + 20, height: canvas_height });
         const ctx = canvas.getContext("2d");
@@ -64,22 +65,24 @@ export default ((Messages) => {
         function videoSet(video) {
             loadingPromises.length = 0;
             loadingPromises.push(
-                new Promise((resolve, reject) => {
-                    videoElement.addEventListener('loadeddata', (e) => {
-                        resolve();
-                    })
-                })
+                new Promise((resolve, reject) => videoElement.addEventListener('loadeddata', () => resolve()))
             );
-            loadingPromises.push(
-                new Promise((resolve, reject) => {
-                    messagesLoadedResolve = resolve;
-                })
-            );
+            loadingPromises.push(new Promise((resolve, reject) => messagesLoadedResolve = resolve));
             videoMetaData = video;
-            videoElement.setAttribute('src', './' + video.source);
-            fetch(video.messages)
+            fetch('./' + video._id.slice(1) + '.mp4')
+                .then((response) => {
+                    hasVideo = response.ok;
+                    if (response.ok) {
+                        videoElement.setAttribute('src', './' + video._id.slice(1) + '.mp4');
+                    } else {
+                        videoElement.dispatchEvent(new Event('loadeddata'));
+                    }
+                });
+
+            fetch('./' + video._id.slice(1) + '.json')
                 .then(response => response.json())
                 .then(messages => {
+                    messages = messages.stats;
                     messageManager = new Messages(messages);
 
                     rawMessageData = messages;
@@ -101,7 +104,7 @@ export default ((Messages) => {
 
                     const chatVideoSyncDiffSec = ((startTimeChatMS - videoStartTimeMS) / 1000);
                     const chatVideoSyncTime = videoDuration + (chatVideoSyncDiffSec - videoLength);
-                    videoElement.currentTime = startTimeSec = chatVideoSyncTime;
+                    if (hasVideo) videoElement.currentTime = startTimeSec = chatVideoSyncTime;
 
                     const maxChatTime = startTimeChatMS + (videoLength - chatVideoSyncDiffSec) * 1000;
                     xDomainEnd = endTimeChatMS = endTimeChatMS > maxChatTime ? maxChatTime : endTimeChatMS;
@@ -213,9 +216,12 @@ export default ((Messages) => {
         function timelineMoveBackward() {
             const sec = bucket_duration_sec / 2,
                 ms = bucket_duration_ms / 2;
-            videoElement.currentTime -= sec;
-            if (videoElement.currentTime < startTimeSec) {
-                videoElement.currentTime = startTimeSec;
+
+            if (hasVideo) {
+                videoElement.currentTime -= sec;
+                if (videoElement.currentTime < startTimeSec) {
+                    videoElement.currentTime = startTimeSec;
+                }
             }
 
             currentMessageTime -= ms;
@@ -230,9 +236,12 @@ export default ((Messages) => {
         function timelineMoveForward() {
             const sec = bucket_duration_sec / 2,
                 ms = bucket_duration_ms / 2;
-            videoElement.currentTime += sec;
-            if (videoElement.currentTime > videoElement.duration) {
-                videoElement.currentTime = videoElement.duration;
+
+            if (hasVideo) {
+                videoElement.currentTime += sec;
+                if (videoElement.currentTime > videoElement.duration) {
+                    videoElement.currentTime = videoElement.duration;
+                }
             }
 
             currentMessageTime += ms;
@@ -255,7 +264,7 @@ export default ((Messages) => {
             let x, y; [x, y] = xyFromMouseEvent(event);
             const xTime = xToTime(x);
 
-            videoElement.currentTime = xTime.video;
+            if (hasVideo) videoElement.currentTime = xTime.video;
             currentMessageTime = xTime.domain;
             display();
             updateTimelineHighlight();
