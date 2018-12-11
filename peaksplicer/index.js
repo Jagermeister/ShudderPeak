@@ -8,7 +8,7 @@ fs.readdir('./input', (err, files) => {
     }
 
     if (files.length % 2 == 1) {
-        const fileName = files[files.length - 1]
+        const fileName = files[files.length - 1];
         fs.copyFile('./input/' + fileName, './output/' + fileName, () => console.log('Moved Odd File'));
     }
 });
