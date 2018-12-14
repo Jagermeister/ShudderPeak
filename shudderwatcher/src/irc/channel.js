@@ -6,11 +6,13 @@ class Channel {
         this.channelName = channelName;
         this.stream = stream;
         this.joined_time = new Date().getTime();
+        this.messages = [];
         this.stats = new MessageStatistics();
     }
 
     onMessage(message) {
         this.stats.observe(message);
+        this.messages.push(message);
     }
 
     statusReport() {
