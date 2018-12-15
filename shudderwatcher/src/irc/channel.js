@@ -37,7 +37,7 @@ class Channel {
                     'display_name': this.stream.channel.display_name
                 },
                 'video': this.stream.video,
-                'stats': this.stats.data
+                'messages': this.messages
             }),
             err => err ? reject(err) : resolve()
         ));
