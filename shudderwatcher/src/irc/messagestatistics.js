@@ -42,16 +42,18 @@ class MessageStatistics {
     }
 
     reportHighLevel(name) {
-        const dateOldest = new Date(+this.data[0].time).toISOString();
-        const duration = (this.data[this.data.length-1].time - this.data[0].time) / 1000 /60;
-        const msgToUser = this.usersUnique.size ? this.message_count / this.usersUnique.size : null;
-        const msgToUserDisplay = msgToUser ? msgToUser.toFixed(1) + 'x' : '';
-        const emoteMultiplier = this.emotesUnique.size ? this.emote_count / this.emotesUnique.size : null;
-        const emoteMultiplierDisplay = emoteMultiplier ? emoteMultiplier.toFixed(1) + 'x' : '';
+        if (this.data.length) {
+            const dateOldest = new Date(+this.data[0].time).toISOString();
+            const duration = (this.data[this.data.length-1].time - this.data[0].time) / 1000 /60;
+            const msgToUser = this.usersUnique.size ? this.message_count / this.usersUnique.size : null;
+            const msgToUserDisplay = msgToUser ? msgToUser.toFixed(1) + 'x' : '';
+            const emoteMultiplier = this.emotesUnique.size ? this.emote_count / this.emotesUnique.size : null;
+            const emoteMultiplierDisplay = emoteMultiplier ? emoteMultiplier.toFixed(1) + 'x' : '';
 
-        const reportPrefix = chalk.bgBlueBright('  ');
-        console.log(`${reportPrefix}${name.slice(0, 12)}\t${dateOldest.slice(0, 10)}\t${duration.toFixed(1)} Mins
-${reportPrefix}  M:${('00000'+this.message_count).slice(-5)} (U:${this.usersUnique.size}) [${msgToUserDisplay}]\tE:${this.emote_count} (${this.emotesUnique.size}) [${emoteMultiplierDisplay}]`);
+            const reportPrefix = chalk.bgBlueBright('  ');
+            console.log(`${reportPrefix}${name.slice(0, 12)}\t${dateOldest.slice(0, 10)}\t${duration.toFixed(1)} Mins
+    ${reportPrefix}  M:${('00000'+this.message_count).slice(-5)} (U:${this.usersUnique.size}) [${msgToUserDisplay}]\tE:${this.emote_count} (${this.emotesUnique.size}) [${emoteMultiplierDisplay}]`);
+        }
     }
 }
 
