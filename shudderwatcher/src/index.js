@@ -39,7 +39,7 @@ authenticate(SCOPES).then((token) => {
                     resolve([]);
                 }
             }))
-            .then((streams) => streams.forEach((stream, i) => setTimeout(() => {
+            .then(streams => streams.forEach((stream, i) => setTimeout(() => {
                 const channelName = stream.channel.name;
                 api.channelLiveVideo(channelName)
                     .then(video => ircServer.join(stream.channel.name, Object.assign({},
@@ -85,7 +85,7 @@ function removeDeadChannels() {
      */
     const serverChannels = Object.keys(ircServer.channelsByName);
     return api.channelsStatusByName(serverChannels)
-        .then((channels) => {
+        .then(channels => {
             const channelNames = channels.map(c => c.channel);
             console.log(`2. Checking for dead channels.. ${serverChannels.length - channelNames.length} found.`);
             serverChannels.forEach(c => {

@@ -17,9 +17,11 @@ api.channelsByViewers = function() {
         };
         request.get(
             `${config.endpoint}${endpoint}?${dictToString(parameters)}`,
-            (err, _, body) => err ? reject(err) : resolve(JSON.parse(body).streams)
+            (e, r, b) => parseJSONPromise(e, r, b, resolve, reject)
         );
-    })).then(streams => streams.map(s => { return {
+    })).then(response => {
+            const streams = response.streams;
+            return streams.map(s => { return {
             _id: s._id,
             viewers: s.viewers,
             created: new Date(s.created_at).getTime(),
@@ -31,9 +33,9 @@ api.channelsByViewers = function() {
                 followers: s.channel.followers
             }};
         }).filter(s => s.viewers > viewerMinimumCount)
-    ).then(streams => streams.filter(s =>
+    }).then(streams => streams.filter(s =>
         !(filter.gamesDisallowed.includes(s.game) || filter.streamersDisallowed.includes(s.channel.name)))
-    );
+    ).catch(err => console.log('/!\\ API.channelsByViewers unable to process response.', err));
 };
 
 api.channelsStatusByName = function (channelNames) {
@@ -46,17 +48,18 @@ api.channelsStatusByName = function (channelNames) {
             };
             request.get(
                 `${config.endpoint}${endpoint}?${dictToString(parameters)}`,
-                (err, _, body) => err ? reject(err) : resolve(JSON.parse(body).streams)
+                (e, r, b) => parseJSONPromise(e, r, b, resolve, reject)
             );
         } else {
             resolve([]);
         }
-    })).then(streams => streams.map(s => {
+    })).then(response => streams.map(s => {
+        const streams = response.streams;
         return {
             channel: s.channel.name,
             viewers: s.viewers,
             created: s.created_at
-    };}));
+    };})).catch(err => console.log('/!\\ API.channelsStatusByName unable to process response.', err));
 };
 
 api.channelLiveVideo = function(channelName) {
@@ -69,27 +72,37 @@ api.channelLiveVideo = function(channelName) {
         };
         request.get(
             `${config.endpoint}${endpoint}?${dictToString(parameters)}`,
-            (err, _, body) => err ? reject(err) : resolve(JSON.parse(body).videos)
+            (e, r, b) => parseJSONPromise(e, r, b, resolve, reject)
         );
-    }))
-    .then(videos => new Promise((resolve, reject) => {
+    })).then(response => new Promise((resolve, reject) => {
+        const videos = response.videos;
         if (videos.length === 1) {
             const video = videos[0];
             if (video.status === 'recording') resolve(video);
         }
 
         reject();
-    }));
+    })).catch(err => console.log('/!\\ API.channelLiveVideo unable to process response.', err));
 };
 
 function fetchToken() {
-    return new Promise((resolve, reject) => {
-        fs.readFile('client_secret.json', (err, data) => err ? reject(err) : resolve(JSON.parse(data)));
-    });
+    return new Promise((resolve, reject) => fs.readFile('client_secret.json', (err, data) => err ? reject(err) : resolve(JSON.parse(data))));
 }
 
 function dictToString(dict) {
     return Object.keys(dict).map(k => `${k}=${dict[k]}`).join('&');
+}
+
+function parseJSONPromise(error, response, body, resolve, reject) {
+    if (error) {
+        reject(error);
+    } else {
+        try {
+            resolve(JSON.parse(body));
+        } catch (e) {
+            reject(e);
+        }
+    }
 }
 
 module.exports = api;
