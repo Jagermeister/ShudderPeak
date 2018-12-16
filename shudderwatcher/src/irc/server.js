@@ -19,7 +19,7 @@ class Server {
 
         setInterval(() => {
             const channels = Object.keys(this.channelsByName);
-            if (channels.length) console.log(chalk.bgBlueBright.white('  Server Channel Status'));
+            if (channels.length) console.log(chalk.bgBlueBright.white('  Server Channel Status  '));
             for (let i = 0, l = channels.length; i < l; i++) {
                 const channel = this.channelsByName[channels[i]];
                 channel.statusReport();

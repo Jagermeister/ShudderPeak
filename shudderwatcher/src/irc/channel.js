@@ -40,7 +40,7 @@ class Channel {
                 'messages': this.messages
             }),
             err => err ? reject(err) : resolve()
-        ));
+        )).catch(err => console.log('!!!', this.channelName, err));
     }
 }
 

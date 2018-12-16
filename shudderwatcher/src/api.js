@@ -51,15 +51,17 @@ api.channelsStatusByName = function (channelNames) {
                 (e, r, b) => parseJSONPromise(e, r, b, resolve, reject)
             );
         } else {
-            resolve([]);
+            resolve({'streams': []});
         }
-    })).then(response => streams.map(s => {
+    })).then(response => {
         const streams = response.streams;
-        return {
-            channel: s.channel.name,
-            viewers: s.viewers,
-            created: s.created_at
-    };})).catch(err => console.log('/!\\ API.channelsStatusByName unable to process response.', err));
+        return streams.map(s => {
+            return {
+                channel: s.channel.name,
+                viewers: s.viewers,
+                created: s.created_at
+        }});
+    }).catch(err => console.log('/!\\ API.channelsStatusByName unable to process response.', err));
 };
 
 api.channelLiveVideo = function(channelName) {

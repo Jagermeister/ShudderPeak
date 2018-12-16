@@ -52,7 +52,7 @@ class MessageStatistics {
 
             const reportPrefix = chalk.bgBlueBright('  ');
             console.log(`${reportPrefix}${name.slice(0, 12)}\t${dateOldest.slice(0, 10)}\t${duration.toFixed(1)} Mins
-    ${reportPrefix}  M:${('00000'+this.message_count).slice(-5)} (U:${this.usersUnique.size}) [${msgToUserDisplay}]\tE:${this.emote_count} (${this.emotesUnique.size}) [${emoteMultiplierDisplay}]`);
+${reportPrefix}  M:${('00000'+this.message_count).slice(-5)} (U:${this.usersUnique.size}) [${msgToUserDisplay}]\tE:${this.emote_count} (${this.emotesUnique.size}) [${emoteMultiplierDisplay}]`);
         }
     }
 }
