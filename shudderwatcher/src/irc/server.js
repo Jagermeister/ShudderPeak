@@ -84,9 +84,11 @@ class Server {
                 console.log('>  IRC', `PART channel '${channelName}'`);
             } else if (parsed.command === "JOIN") {
                 const channelName = parsed.channel;
-                const stream = this.streamByChannelName[channelName];
-                this.channelsByName[channelName] = new Channel(channelName, stream);
-                delete this.streamByChannelName[channelName];
+                if (channelName.indexOf('!') === -1) {
+                    const stream = this.streamByChannelName[channelName];
+                    this.channelsByName[channelName] = new Channel(channelName, stream);
+                    delete this.streamByChannelName[channelName];
+                }
             } else if (parsed.command === "USERSTATE") {
                 //> @badges=<badges>;color=<color>;display-name=<display-name>;emote-sets=<emotes>;mod=<mod>;subscriber=<subscriber>;turbo=<turbo>;user-type=<user-type> :<host> USERSTATE #<channel>
             } else if (parsed.command === "GLOBALUSERSTATE") {
