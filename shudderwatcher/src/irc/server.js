@@ -23,7 +23,7 @@ class Server {
             for (let i = 0, l = channels.length; i < l; i++) {
                 const channel = this.channelsByName[channels[i]];
                 channel.statusReport();
-                channel.writeFile('../data/stream/');
+                channel.writeStreamFile();
             }
         }, 60000);
     }
@@ -54,7 +54,7 @@ class Server {
 
     part(channelName) {
         if (channelName in this.channelsByName) {
-            return this.channelsByName[channelName].writeFile()
+            return this.channelsByName[channelName].writeStreamFile()
                 .then(() => this.send({ command: "Depart Channel", message: `PART #${channelName}` }));
         } else {
             console.log('Cannot leave channel you havent joined', channelName);

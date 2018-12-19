@@ -23,9 +23,9 @@ class Channel {
         return `${this.channelName}_${this.joined_time}_${this.stream.created}_${this.stream.game}.json`;
     }
 
-    writeFile(rootFilePath='./') {
+    writeStreamFile() {
         return new Promise((resolve, reject) => fs.writeFile(
-            rootFilePath + this.filename(),
+            '../../data/stream/' + this.filename(),
             JSON.stringify({
                 'stream': {
                     '_id': this.stream._id,
@@ -41,6 +41,14 @@ class Channel {
             }),
             err => err ? reject(err) : resolve()
         )).catch(err => console.log('!!!', this.channelName, err));
+    }
+
+    moveFileToCompleted() {
+        const filename = this.filename(),
+            filePath = '../data/stream/' + filename,
+            movePath = '../data/highlight/' + filename;
+        return new Promise((resolve, reject) => fs.rename(filePath, movePath,
+            err => err ? reject(err) : resolve(filePath, movePath)));
     }
 }
 
