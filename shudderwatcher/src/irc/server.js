@@ -38,9 +38,7 @@ class Server {
         };
         this.webSocket.onopen = this.onOpen.bind(this);
         const server = this;
-        return new Promise((resolve, reject) => {
-            server.serverOnOpenResolve = resolve;
-        });
+        return new Promise((resolve, reject) => server.serverOnOpenResolve = resolve);
     }
 
     join(channelName, stream) {
@@ -84,7 +82,7 @@ class Server {
                 console.log('>  IRC', `PART channel '${channelName}'`);
             } else if (parsed.command === "JOIN") {
                 const channelName = parsed.channel;
-                if (channelName.indexOf('!') === -1) {
+                if (channelName.indexOf('!') === -1 && channelName.indexOf(':') === -1) {
                     const stream = this.streamByChannelName[channelName];
                     this.channelsByName[channelName] = new Channel(channelName, stream);
                     delete this.streamByChannelName[channelName];
