@@ -25,7 +25,7 @@ class Channel {
 
     writeStreamFile() {
         return new Promise((resolve, reject) => fs.writeFile(
-            '../../data/stream/' + this.filename(),
+            '../data/stream/' + this.filename(),
             JSON.stringify({
                 'stream': {
                     '_id': this.stream._id,
