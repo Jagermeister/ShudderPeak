@@ -83,6 +83,7 @@ class Server {
             } else if (parsed.command === "JOIN") {
                 const channelName = parsed.channel;
                 if (channelName.indexOf('!') === -1 && channelName.indexOf(':') === -1) {
+                    // Distinguish between channel and users
                     const stream = this.streamByChannelName[channelName];
                     this.channelsByName[channelName] = new Channel(channelName, stream);
                     delete this.streamByChannelName[channelName];
